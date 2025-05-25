@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { videos } from '../data/videos';
 import VideoCard from './VideoCard';
 import { VideoCategory } from '../types';
 
 const VideoGallery: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<VideoCategory>('all');
-  const [visibleCount, setVisibleCount] = useState(15); // 初始显示5行，每行3个视频
-  const videosPerPage = 6; // 每次加载5行，每行3个视频
+  const [visibleCount, setVisibleCount] = useState(8); // 初始只加载4个视频，减轻加载压力
+  const [filteredVideos, setFilteredVideos] = useState(videos);
+  const videosPerPage = 4; // 每次加载更多的视频数量
 
   const categories: { id: VideoCategory; label: string }[] = [
     { id: 'all', label: 'All' },
@@ -17,12 +18,19 @@ const VideoGallery: React.FC = () => {
     { id: 'other', label: 'Other' },
   ];
 
-  const filteredVideos = activeCategory === 'all' 
-    ? videos 
-    : videos.filter(video => video.category === activeCategory);
+  // 当分类变化时更新筛选结果
+  useEffect(() => {
+    const newFilteredVideos = activeCategory === 'all' 
+      ? videos 
+      : videos.filter(video => video.category === activeCategory);
+    
+    setFilteredVideos(newFilteredVideos);
+  }, [activeCategory]);
   
+  // 提取当前可见的视频
   const visibleVideos = filteredVideos.slice(0, visibleCount);
   
+  // 加载更多视频
   const loadMoreVideos = () => {
     setVisibleCount(prevCount => prevCount + videosPerPage);
   };
@@ -31,6 +39,8 @@ const VideoGallery: React.FC = () => {
   const handleCategoryChange = (category: VideoCategory) => {
     setActiveCategory(category);
     setVisibleCount(videosPerPage);
+    // 平滑滚动到分类部分
+    document.getElementById('category-buttons')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
@@ -45,7 +55,7 @@ const VideoGallery: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap justify-center mb-12 gap-3">
+        <div id="category-buttons" className="flex flex-wrap justify-center mb-12 gap-3">
           {categories.map(category => (
             <button
               key={category.id}
@@ -61,9 +71,12 @@ const VideoGallery: React.FC = () => {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6 max-w-7xl mx-auto">
-          {visibleVideos.map(video => (
-            <VideoCard key={video.id} video={video} />
+        {/* 瀑布流布局 */}
+        <div className="masonry-grid">
+          {visibleVideos.map((video, index) => (
+            <div key={video.id} className="masonry-item">
+              <VideoCard video={video} />
+            </div>
           ))}
         </div>
 
@@ -73,7 +86,7 @@ const VideoGallery: React.FC = () => {
               onClick={loadMoreVideos}
               className="px-8 py-3.5 bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-[#8A7CFF]/20 hover:translate-y-[-2px]"
             >
-              More
+              More Videos
             </button>
           </div>
         )}

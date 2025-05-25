@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Video } from '../types';
 
 interface VideoCardProps {
@@ -6,19 +6,16 @@ interface VideoCardProps {
 }
 
 const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
-  const [iframeHeight, setIframeHeight] = useState(500);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [loaded, setLoaded] = useState(false);
 
-  // 获取嵌入URL
+  // 获取嵌入URL，确保正确显示完整推文
   const getEmbedUrl = () => {
     if (video.embedUrl) {
-      // 添加dark主题参数，确保URL格式正确
       const baseUrl = video.embedUrl.split('?')[0];
       const params = new URLSearchParams(video.embedUrl.split('?')[1] || '');
       params.set('theme', 'dark');
       params.set('dnt', 'true');
-      params.set('hideCard', 'false');
-      params.set('hideThread', 'false');
       return `${baseUrl}?${params.toString()}`;
     }
     
@@ -35,39 +32,41 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
     
     if (!tweetId) return '';
     
-    return `https://platform.twitter.com/embed/Tweet.html?id=${tweetId}&theme=dark&dnt=true&hideCard=false&hideThread=false`;
+    // 基础URL，不添加过多可能导致问题的参数
+    return `https://platform.twitter.com/embed/Tweet.html?id=${tweetId}&theme=dark`;
   };
 
-  // 监听窗口大小变化，调整iframe高度
+  // 使用简单的onLoad处理程序
   useEffect(() => {
-    const checkSize = () => {
-      if (window.innerWidth <= 768) {
-        setIframeHeight(550); // 移动设备上更高一些
-      } else {
-        setIframeHeight(500);
-      }
+    const handleLoad = () => {
+      // 延迟设置加载完成，确保内容有时间渲染
+      setTimeout(() => setLoaded(true), 800);
     };
 
-    checkSize();
-    window.addEventListener('resize', checkSize);
-    return () => window.removeEventListener('resize', checkSize);
+    if (iframeRef.current) {
+      iframeRef.current.onload = handleLoad;
+    }
+
+    // 保险措施：3秒后无论如何都显示内容
+    const timer = setTimeout(() => {
+      setLoaded(true);
+    }, 3000);
+
+    return () => clearTimeout(timer);
   }, []);
 
   return (
-    <div className="overflow-hidden mb-10 transition-all duration-300 hover:translate-y-[-5px]">
+    <div className={`twitter-card-wrapper ${loaded ? 'loaded' : 'loading'}`}>
       <iframe
         ref={iframeRef}
         src={getEmbedUrl()}
-        className="w-full rounded-xl"
-        style={{ 
-          height: `${iframeHeight}px`,
-          maxWidth: '100%'
-        }}
+        className="twitter-card"
+        style={{ height: '550px' }}
         frameBorder="0"
-        allowFullScreen
         scrolling="no"
+        allowFullScreen
         title={`Tweet by ${video.creator}`}
-        referrerPolicy="strict-origin-when-cross-origin"
+        loading="lazy"
       />
     </div>
   );

@@ -1,3 +1,105 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* 瀑布流布局核心样式 */
+.masonry-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* 响应式布局 */
+@media (min-width: 640px) {
+  .masonry-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .masonry-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .masonry-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Twitter卡片样式 */
+.masonry-item {
+  break-inside: avoid;
+  margin-bottom: 20px;
+  border-radius: 16px;
+  overflow: hidden;
+  background-color: #15202b;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.masonry-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Twitter卡片包装器 */
+.twitter-card-wrapper {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+/* 加载状态 */
+.twitter-card-wrapper.loading::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #1A2733;
+  z-index: 1;
+}
+
+.twitter-card-wrapper.loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  border: 4px solid rgba(138, 124, 255, 0.2);
+  border-top-color: #8A7CFF;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 2;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Twitter卡片iframe */
+.twitter-card {
+  width: 100% !important;
+  border: none;
+  overflow: hidden;
+  display: block;
+}
+
+/* 加载时隐藏，加载完成后显示 */
+.twitter-card-wrapper.loading .twitter-card {
+  opacity: 0;
+}
+
+.twitter-card-wrapper.loaded .twitter-card {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
