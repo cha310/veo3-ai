@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogIn, LogOut, User } from 'lucide-react';
+import LoginModal from './LoginModal';
+
+interface UserData {
+  name?: string;
+  email: string;
+  picture?: string;
+}
 
 const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [activePage, setActivePage] = useState('home');
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [user, setUser] = useState<UserData | null>(null);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -15,9 +25,28 @@ const Navbar: React.FC = () => {
       }
     };
 
+    // 检查本地存储中的用户数据
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        setUser(JSON.parse(userData));
+      } catch (error) {
+        console.error('解析用户数据错误:', error);
+        localStorage.removeItem('user');
+      }
+    }
+
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // 处理登出
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUser(null);
+    setIsUserMenuOpen(false);
+    window.location.reload();
+  };
 
   return (
     <header
@@ -65,21 +94,87 @@ const Navbar: React.FC = () => {
           >
             Features
           </a>
-          <a 
-            href="#" 
-            onClick={() => setActivePage('about')}
-            className={`transition-colors ${
-              activePage === 'about' 
-                ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
-                : 'text-white hover:text-[#8A7CFF]'
-            }`}
-          >
-            About
-          </a>
+          
+          {/* 登录按钮或用户头像 */}
+          {user ? (
+            <div className="relative">
+              <button 
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="flex items-center space-x-2 focus:outline-none"
+              >
+                <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-[#6C5CE7]">
+                  {user.picture ? (
+                    <img 
+                      src={user.picture} 
+                      alt={user.name || 'User'} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-[#6C5CE7] flex items-center justify-center text-white">
+                      <User size={16} />
+                    </div>
+                  )}
+                </div>
+              </button>
+              
+              {/* 用户下拉菜单 */}
+              {isUserMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-[#1a1e27] rounded-lg shadow-lg py-2 z-10">
+                  <div className="px-4 py-2 border-b border-gray-700">
+                    <p className="text-sm font-medium text-white truncate">{user.name || 'User'}</p>
+                    <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-sm text-white hover:bg-[#252a37] flex items-center space-x-2"
+                  >
+                    <LogOut size={16} />
+                    <span>Log out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsLoginModalOpen(true)}
+              className="px-4 py-1.5 bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white rounded-lg hover:shadow-lg hover:shadow-[#8A7CFF]/20 transition-all flex items-center gap-2"
+            >
+              <LogIn size={16} />
+              <span>Login</span>
+            </button>
+          )}
         </div>
 
         {/* Mobile Menu Button */}
-        <div className="md:hidden">
+        <div className="md:hidden flex items-center">
+          {user ? (
+            <button 
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="mr-3"
+            >
+              <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-[#6C5CE7]">
+                {user.picture ? (
+                  <img 
+                    src={user.picture} 
+                    alt={user.name || 'User'} 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-[#6C5CE7] flex items-center justify-center text-white">
+                    <User size={16} />
+                  </div>
+                )}
+              </div>
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsLoginModalOpen(true)}
+              className="mr-3 p-1.5 bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white rounded-lg hover:shadow-lg hover:shadow-[#8A7CFF]/20 transition-all"
+            >
+              <LogIn size={18} />
+            </button>
+          )}
+          
           <button 
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="text-white hover:text-[#8A7CFF] transition-colors"
@@ -134,24 +229,44 @@ const Navbar: React.FC = () => {
               >
                 Features
               </a>
-              <a 
-                href="#" 
-                onClick={() => {
-                  setActivePage('about');
-                  setIsMenuOpen(false);
-                }}
-                className={`transition-colors ${
-                  activePage === 'about' 
-                    ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
-                    : 'text-white hover:text-[#8A7CFF]'
-                }`}
-              >
-                About
-              </a>
+              
+              {/* 移动端登出选项 */}
+              {user && (
+                <button
+                  onClick={handleLogout}
+                  className="text-left text-white hover:text-[#8A7CFF] flex items-center space-x-2"
+                >
+                  <LogOut size={16} />
+                  <span>Log out</span>
+                </button>
+              )}
             </div>
           </div>
         )}
+        
+        {/* 用户菜单（移动端） */}
+        {isUserMenuOpen && user && (
+          <div className="absolute top-full right-4 mt-2 w-48 bg-[#1a1e27] rounded-lg shadow-lg py-2 z-10 md:hidden">
+            <div className="px-4 py-2 border-b border-gray-700">
+              <p className="text-sm font-medium text-white truncate">{user.name || 'User'}</p>
+              <p className="text-xs text-gray-400 truncate">{user.email}</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="w-full text-left px-4 py-2 text-sm text-white hover:bg-[#252a37] flex items-center space-x-2"
+            >
+              <LogOut size={16} />
+              <span>Log out</span>
+            </button>
+          </div>
+        )}
       </nav>
+
+      {/* 登录模态框 */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onRequestClose={() => setIsLoginModalOpen(false)}
+      />
     </header>
   );
 };
