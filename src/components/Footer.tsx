@@ -1,18 +1,15 @@
 import React from 'react';
-import { Video, Mail} from 'lucide-react';
+import { Mail} from 'lucide-react';
 
 const Footer: React.FC = () => {
   return (
-    <footer className="bg-gray-900 text-gray-300 py-12 px-4 sm:px-6 lg:px-8">
+    <footer className="bg-[#000000] text-gray-300 py-12 px-4 sm:px-6 lg:px-8">
       <div className="container mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Logo and Description */}
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center mb-4">
-              <Video className="h-8 w-8 text-indigo-400" />
-              <span className="ml-2 text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-                Veo3
-              </span>
+              <img src="/VEOAI2.svg" alt="Veo3 AI Logo" className="h-6 w-auto" />
             </div>
             <p className="text-sm text-gray-400 mb-6 max-w-md">
               Create lifelike AI videos with Veo 3: dynamic sound effects, clear dialogue, and immersive background audio—all in perfect harmony.

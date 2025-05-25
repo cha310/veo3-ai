@@ -34,7 +34,7 @@ const VideoGallery: React.FC = () => {
   };
 
   return (
-    <section id="videos" className="py-20 px-4 sm:px-6 lg:px-8 bg-[#1E2732]">
+    <section id="videos" className="py-20 px-4 sm:px-6 lg:px-8 bg-[#121a22]">
       <div className="container mx-auto">
         <div className="text-center mb-14">
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-5">
