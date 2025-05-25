@@ -60,11 +60,11 @@ const Navbar: React.FC = () => {
         </div>
 
         {/* Desktop Navigation */}
-        <div className="hidden md:flex space-x-8">
+        <div className="hidden md:flex items-center space-x-8">
           <a 
             href="#" 
             onClick={() => setActivePage('home')}
-            className={`transition-colors ${
+            className={`transition-colors py-1.5 ${
               activePage === 'home' 
                 ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
                 : 'text-white hover:text-[#8A7CFF]'
@@ -75,7 +75,7 @@ const Navbar: React.FC = () => {
           <a 
             href="#videos" 
             onClick={() => setActivePage('videos')}
-            className={`transition-colors ${
+            className={`transition-colors py-1.5 ${
               activePage === 'videos' 
                 ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
                 : 'text-white hover:text-[#8A7CFF]'
@@ -86,7 +86,7 @@ const Navbar: React.FC = () => {
           <a 
             href="#" 
             onClick={() => setActivePage('features')}
-            className={`transition-colors ${
+            className={`transition-colors py-1.5 ${
               activePage === 'features' 
                 ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
                 : 'text-white hover:text-[#8A7CFF]'
