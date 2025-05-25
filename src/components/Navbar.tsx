@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, Video } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -27,10 +27,7 @@ const Navbar: React.FC = () => {
     >
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
         <div className="flex items-center">
-          <Video className="h-8 w-8 text-[#8A7CFF]" />
-          <span className="ml-2 text-xl font-bold bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent">
-            Veo3
-          </span>
+          <img src="/VEOAI2.svg" alt="Veo3 AI Logo" className="h-6 w-auto" />
         </div>
 
         {/* Desktop Navigation */}
