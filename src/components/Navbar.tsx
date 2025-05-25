@@ -139,7 +139,6 @@ const Navbar: React.FC = () => {
               onClick={() => setIsLoginModalOpen(true)}
               className="px-4 py-1.5 bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white rounded-lg hover:shadow-lg hover:shadow-[#8A7CFF]/20 transition-all flex items-center gap-2"
             >
-              <LogIn size={16} />
               <span>Login</span>
             </button>
           )}
