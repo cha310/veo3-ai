@@ -1,0 +1,432 @@
+import React, { useState, useRef, useEffect } from 'react';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
+
+// 后端API URL
+const API_URL = process.env.NODE_ENV === 'production' 
+  ? '/api/text-to-video' 
+  : 'http://localhost:5002/api/text-to-video';
+
+// 默认示例视频路径
+const DEFAULT_SAMPLE_VIDEO = '/videos/sample-video.mp4';
+
+const TextToVideo: React.FC = () => {
+  // 状态管理
+  const [prompt, setPrompt] = useState('');
+  const [aspectRatio, setAspectRatio] = useState('16:9');
+  const [videoLength, setVideoLength] = useState('5s');
+  const [outputNumber, setOutputNumber] = useState(1);
+  const [isPublic, setIsPublic] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [videoTime, setVideoTime] = useState({ current: "0:00", total: "0:00" });
+  const [isDefaultVideo, setIsDefaultVideo] = useState(true);
+  
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // 组件加载时设置默认视频
+  useEffect(() => {
+    setGeneratedVideo(DEFAULT_SAMPLE_VIDEO);
+  }, []);
+  
+  // 更新视频时间信息
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+    
+    const updateTime = () => {
+      const currentTime = formatTime(videoElement.currentTime);
+      const duration = formatTime(videoElement.duration);
+      setVideoTime({ current: currentTime, total: duration });
+    };
+    
+    // 监听视频事件
+    videoElement.addEventListener('timeupdate', updateTime);
+    videoElement.addEventListener('loadedmetadata', updateTime);
+    
+    return () => {
+      videoElement.removeEventListener('timeupdate', updateTime);
+      videoElement.removeEventListener('loadedmetadata', updateTime);
+    };
+  }, [generatedVideo]);
+  
+  // 格式化时间为 mm:ss 格式
+  const formatTime = (time: number): string => {
+    if (isNaN(time)) return "0:00";
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+  };
+  
+  // 文本区域自动调整高度
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  };
+  
+  // 字符计数
+  const charCount = prompt.length;
+  const maxChars = 1500;
+  
+  // 生成视频
+  const generateVideo = async () => {
+    if (!prompt.trim()) {
+      setError('请输入提示词');
+      return;
+    }
+    
+    setError(null);
+    setIsGenerating(true);
+    
+    try {
+      // 使用后端API来处理请求
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt,
+          aspectRatio,
+          videoLength,
+          outputNumber,
+          isPublic
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || '视频生成失败');
+      }
+      
+      const data = await response.json();
+      if (data.success) {
+        // 设置为新生成的视频
+        setGeneratedVideo(data.videoUrl);
+        setIsDefaultVideo(false);
+        
+        // 如果视频元素存在，重置并播放
+        if (videoRef.current) {
+          videoRef.current.load();
+          videoRef.current.play();
+        }
+      } else {
+        throw new Error(data.message || '视频生成失败');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '视频生成失败，请重试';
+      setError(errorMessage);
+      console.error('生成错误:', err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+  
+  // 示例提示词
+  const samplePrompts = [
+    'Dawn Jogger',
+    'Desert Wanderer',
+    'Urban Green',
+    'Park Life'
+  ];
+  
+  return (
+    <div className="min-h-screen bg-[#121a22] text-white">
+      <Navbar />
+      
+      <main className="container mx-auto px-4 pt-24 pb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* 左侧：输入区域 */}
+          <div className="bg-[#1a1e27] rounded-xl p-6">
+            <h1 className="text-2xl font-bold mb-6">Text to Video</h1>
+            
+            <div className="flex items-center justify-between mb-4">
+              <label className="font-medium">Prompt</label>
+              <div className="flex items-center gap-1">
+                <div className="w-6 h-6 rounded-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] flex items-center justify-center">
+                  <span className="text-xs">G</span>
+                </div>
+                <span>Google Veo 2</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <textarea 
+                ref={textareaRef}
+                value={prompt}
+                onChange={(e) => {
+                  setPrompt(e.target.value);
+                  adjustTextareaHeight();
+                }}
+                className="w-full bg-[#252a37] border border-[#343a4d] rounded-lg py-3 px-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#6C5CE7] min-h-[120px] resize-none"
+                placeholder="What do you want to create?"
+                maxLength={maxChars}
+              />
+              
+              <div className="flex justify-end text-gray-400 text-sm mt-1">
+                {charCount} / {maxChars}
+              </div>
+            </div>
+            
+            {/* 示例提示词 */}
+            <div className="mb-8">
+              <div className="flex items-center gap-2 text-sm text-gray-400 mb-2">
+                <span>Ideas:</span>
+                <div className="flex flex-wrap gap-2">
+                  {samplePrompts.map((sample, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        setPrompt(sample);
+                        if (textareaRef.current) {
+                          textareaRef.current.style.height = 'auto';
+                        }
+                      }}
+                      className="text-gray-300 hover:text-white"
+                    >
+                      {sample}
+                    </button>
+                  ))}
+                </div>
+                <button className="ml-auto">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            {/* 宽高比 */}
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-1">Aspect Ratio</h3>
+              <p className="text-gray-400 text-sm mb-3">Choose the appropriate aspect ratio.</p>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => setAspectRatio('16:9')}
+                  className={`p-6 rounded-lg flex flex-col items-center justify-center ${
+                    aspectRatio === '16:9' 
+                      ? 'bg-[#343a4d] border-2 border-[#e74694]' 
+                      : 'bg-[#252a37] border border-[#343a4d]'
+                  }`}
+                >
+                  <div className="w-10 h-6 bg-[#e74694] rounded-sm mb-3"></div>
+                  <span>16:9</span>
+                </button>
+                
+                <button
+                  onClick={() => setAspectRatio('9:16')}
+                  className={`p-6 rounded-lg flex flex-col items-center justify-center ${
+                    aspectRatio === '9:16' 
+                      ? 'bg-[#343a4d] border-2 border-[#6C5CE7]' 
+                      : 'bg-[#252a37] border border-[#343a4d]'
+                  }`}
+                >
+                  <div className="w-6 h-10 bg-[#6C5CE7] rounded-sm mb-3"></div>
+                  <span>9:16</span>
+                </button>
+              </div>
+            </div>
+            
+            {/* 视频长度 */}
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-4">Video Length</h3>
+              
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setVideoLength('5s')}
+                  className={`flex-1 py-2 rounded-full ${
+                    videoLength === '5s' 
+                      ? 'bg-[#e74694] text-white' 
+                      : 'bg-[#252a37] text-gray-300'
+                  }`}
+                >
+                  5s
+                </button>
+                
+                <button
+                  onClick={() => setVideoLength('8s')}
+                  className={`flex-1 py-2 rounded-full ${
+                    videoLength === '8s' 
+                      ? 'bg-[#e74694] text-white' 
+                      : 'bg-[#252a37] text-gray-300'
+                  }`}
+                >
+                  8s
+                </button>
+              </div>
+            </div>
+            
+            {/* 输出视频数量 */}
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-4">Output Video Number</h3>
+              
+              <div className="grid grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map(num => (
+                  <button
+                    key={num}
+                    onClick={() => setOutputNumber(num)}
+                    className={`py-2 rounded-lg ${
+                      outputNumber === num
+                        ? 'bg-[#343a4d] border-2 border-[#e74694] text-white' 
+                        : 'bg-[#252a37] border border-[#343a4d] text-gray-300'
+                    }`}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* 公开可见性 */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Public Visibility</h3>
+                
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={() => setIsPublic(!isPublic)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-[#252a37] rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#e74694]"></div>
+                </label>
+              </div>
+            </div>
+            
+            {/* 积分信息 */}
+            <div className="mb-6 flex items-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-2">
+                <rect width="24" height="24" rx="12" fill="#e74694" fillOpacity="0.2"/>
+                <path d="M12 6C8.68629 6 6 8.68629 6 12C6 15.3137 8.68629 18 12 18C15.3137 18 18 15.3137 18 12C18 8.68629 15.3137 6 12 6Z" fill="#e74694"/>
+              </svg>
+              <span className="text-sm">Credits required: 180</span>
+            </div>
+            
+            {/* 生成按钮 */}
+            <button
+              onClick={generateVideo}
+              disabled={isGenerating || !prompt.trim()}
+              className={`w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 ${
+                isGenerating || !prompt.trim()
+                  ? 'bg-[#343a4d] text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white hover:shadow-lg hover:shadow-[#8A7CFF]/20'
+              }`}
+            >
+              {isGenerating ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  生成中...
+                </>
+              ) : (
+                <>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 16L12 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M9 13L12 16L15 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M20 4L4 4L4 20L20 20L20 4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Create
+                </>
+              )}
+            </button>
+            
+            {/* 错误信息 */}
+            {error && (
+              <div className="mt-4 text-red-500 text-sm">
+                {error}
+              </div>
+            )}
+          </div>
+          
+          {/* 右侧：视频预览 */}
+          <div className="bg-[#1a1e27] rounded-xl p-6">
+            <h2 className="text-xl font-medium mb-6">
+              {isDefaultVideo ? 'Sample Video' : 'Generated Video'}
+            </h2>
+            
+            <div className="bg-[#0F1218] rounded-lg overflow-hidden flex items-center justify-center min-h-[500px]">
+              {generatedVideo ? (
+                <video
+                  ref={videoRef}
+                  src={generatedVideo}
+                  className="w-full h-auto"
+                  controls
+                  autoPlay
+                  loop
+                  preload="auto"
+                  poster="/images/video-poster.svg"
+                ></video>
+              ) : (
+                <div className="text-center p-8">
+                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-4 text-gray-500">
+                    <path d="M15 10L19.5528 7.72361C19.8343 7.58281 20 7.30339 20 7V5.5C20 4.67157 19.3284 4 18.5 4H5.5C4.67157 4 4 4.67157 4 5.5V16.5C4 17.3284 4.67157 18 5.5 18H18.5C19.3284 18 20 17.3284 20 16.5V15C20 14.6966 19.8343 14.4172 19.5528 14.2764L15 12V10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <p className="text-gray-400">视频加载中或尚未生成，请稍候...</p>
+                </div>
+              )}
+            </div>
+            
+            {generatedVideo && (
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <button className="p-2 rounded-full bg-[#252a37] hover:bg-[#343a4d]">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M5 3V7M3 5H7M6 17V21M4 19H8M13 3L15.2857 9.85714L21 12L15.2857 14.1429L13 21L10.7143 14.1429L5 12L10.7143 9.85714L13 3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                  <div className="flex items-center">
+                    <span className="text-gray-400">{videoTime.current}</span>
+                    <span className="mx-1 text-gray-500">/</span>
+                    <span className="text-gray-400">{videoTime.total}</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <button 
+                    className="p-2 rounded-full bg-[#252a37] hover:bg-[#343a4d]"
+                    onClick={() => {
+                      if (videoRef.current) {
+                        videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 5);
+                      }
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M15 5L9 12L15 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                  <button 
+                    className="p-2 rounded-full bg-[#252a37] hover:bg-[#343a4d]"
+                    onClick={() => {
+                      if (videoRef.current) {
+                        videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 5);
+                      }
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 5L15 12L9 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+      
+      <Footer />
+    </div>
+  );
+};
+
+export default TextToVideo; 
