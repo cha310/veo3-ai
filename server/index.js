@@ -7,7 +7,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 9000;
 
 // 中间件
 app.use(cors());
@@ -15,11 +15,21 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // 静态文件
-app.use(express.static(path.join(__dirname, '../dist')));
+const distPath = path.join(__dirname, '../dist');
+console.log('静态文件路径：', distPath);
+app.use(express.static(distPath));
+
+// 添加健康检查端点
+app.get('/health', (req, res) => {
+  res.status(200).send('服务器正常运行');
+});
 
 // 所有路由请求转发到前端
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../dist', 'index.html'));
+  const indexPath = path.join(__dirname, '../dist', 'index.html');
+  console.log('请求路径:', req.path);
+  console.log('提供文件:', indexPath);
+  res.sendFile(indexPath);
 });
 
 // 启动服务器
