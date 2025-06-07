@@ -49,8 +49,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
           return;
         }
         
-        // 处理登录成功
-        localStorage.setItem('user', JSON.stringify(userInfo));
+        // 处理登录成功，添加默认积分字段
+        const userData = {
+          ...userInfo,
+          credits: 0 // 默认积分为0
+        };
+        
+        localStorage.setItem('user', JSON.stringify(userData));
         onRequestClose();
         window.location.reload(); // 刷新页面以更新登录状态
       } catch (error) {
