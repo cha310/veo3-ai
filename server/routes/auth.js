@@ -3,34 +3,82 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const adminConfig = require('../config/admin');
 
 // 日志文件路径
 const LOG_FILE_PATH = path.join(__dirname, '../logs/login_logs.json');
+const ADMIN_LOG_PATH = path.join(__dirname, '../logs/admin_logs.json');
 
 // 管理员身份验证中间件
 const adminAuth = (req, res, next) => {
   try {
-    const adminPassword = req.query.password;
-    // 管理员密码应该存储在环境变量中
-    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'veoai-admin-2024';
+    // 检查是否提供了令牌
+    const token = req.headers.authorization?.split(' ')[1] || req.cookies?.adminToken;
     
-    if (!adminPassword) {
-      return res.status(401).json({ 
-        success: false, 
-        message: '未提供管理员密码' 
-      });
+    if (token) {
+      // 验证令牌
+      const admin = adminConfig.validateAuthToken(token);
+      if (admin) {
+        // 将管理员信息附加到请求对象
+        req.admin = admin;
+        return next();
+      }
     }
     
-    if (adminPassword !== ADMIN_PASSWORD) {
-      console.log('管理员密码验证失败，提供的密码:', adminPassword);
+    // 检查是否提供了用户名和密码
+    const { username, password } = req.body;
+    const queryPassword = req.query.password;
+    
+    // 兼容旧方式：只提供密码
+    if (queryPassword && !username) {
+      // 旧的验证方式，仅检查密码是否匹配默认密码
+      const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'veoai-admin-2024';
+      if (queryPassword === ADMIN_PASSWORD) {
+        req.admin = {
+          id: '1',
+          username: 'admin',
+          displayName: '系统管理员',
+          role: 'super_admin'
+        };
+        return next();
+      }
+      
+      console.log('管理员密码验证失败，提供的密码:', queryPassword);
       return res.status(401).json({ 
         success: false, 
         message: '管理员密码错误' 
       });
     }
     
-    // 验证通过
-    next();
+    // 新的验证方式，检查用户名和密码
+    if (username && password) {
+      const admin = adminConfig.validateAdmin(username, password);
+      if (admin) {
+        // 将管理员信息附加到请求对象
+        req.admin = admin;
+        
+        // 创建身份验证令牌
+        const token = adminConfig.createAuthToken(admin);
+        
+        // 记录管理员登录
+        logAdminLogin(admin, req);
+        
+        // 在响应中设置令牌
+        res.cookie('adminToken', token, { 
+          httpOnly: true, 
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: adminConfig.getAdminConfig().security.tokenExpiresIn * 60 * 60 * 1000
+        });
+        
+        return next();
+      }
+    }
+    
+    // 未提供有效的身份验证信息
+    return res.status(401).json({ 
+      success: false, 
+      message: '未提供有效的管理员身份验证信息' 
+    });
   } catch (error) {
     console.error('管理员验证错误:', error);
     res.status(500).json({ 
@@ -39,6 +87,54 @@ const adminAuth = (req, res, next) => {
     });
   }
 };
+
+// 记录管理员登录信息
+function logAdminLogin(admin, req) {
+  if (!adminConfig.getAdminConfig().audit.enableLoginLog) {
+    return;
+  }
+  
+  try {
+    // 确保日志目录存在
+    const logDir = path.dirname(ADMIN_LOG_PATH);
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    
+    // 读取现有日志
+    let logs = [];
+    if (fs.existsSync(ADMIN_LOG_PATH)) {
+      try {
+        const logData = fs.readFileSync(ADMIN_LOG_PATH, 'utf8');
+        logs = JSON.parse(logData);
+      } catch (error) {
+        console.error('读取管理员日志文件错误:', error);
+      }
+    }
+    
+    // 创建新的日志条目
+    const newLog = {
+      id: uuidv4(),
+      adminId: admin.id,
+      username: admin.username,
+      displayName: admin.displayName,
+      action: 'login',
+      timestamp: new Date().toISOString(),
+      userAgent: req.headers['user-agent'] || '未知',
+      ipAddress: req.ip || req.connection.remoteAddress || '未知',
+    };
+    
+    // 添加新日志
+    logs.push(newLog);
+    
+    // 写入日志文件
+    fs.writeFileSync(ADMIN_LOG_PATH, JSON.stringify(logs, null, 2));
+    
+    console.log('管理员登录日志已记录:', admin.username);
+  } catch (error) {
+    console.error('记录管理员登录信息错误:', error);
+  }
+}
 
 // 确保日志目录和文件存在
 const ensureLogDirectoryExists = () => {
@@ -59,6 +155,61 @@ const ensureLogDirectoryExists = () => {
     throw new Error('无法创建日志目录或文件');
   }
 };
+
+// 管理员登录端点
+router.post('/admin-login', (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供用户名和密码'
+      });
+    }
+    
+    const admin = adminConfig.validateAdmin(username, password);
+    
+    if (!admin) {
+      return res.status(401).json({
+        success: false,
+        message: '用户名或密码错误'
+      });
+    }
+    
+    // 创建身份验证令牌
+    const token = adminConfig.createAuthToken(admin);
+    
+    // 记录管理员登录
+    logAdminLogin(admin, req);
+    
+    // 在响应中设置令牌
+    res.cookie('adminToken', token, { 
+      httpOnly: true, 
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: adminConfig.getAdminConfig().security.tokenExpiresIn * 60 * 60 * 1000
+    });
+    
+    res.status(200).json({
+      success: true,
+      message: '登录成功',
+      admin: {
+        id: admin.id,
+        username: admin.username,
+        displayName: admin.displayName,
+        role: admin.role
+      },
+      token
+    });
+  } catch (error) {
+    console.error('管理员登录错误:', error);
+    res.status(500).json({
+      success: false,
+      message: '登录过程中发生错误',
+      error: error.message
+    });
+  }
+});
 
 // 记录用户登录信息
 router.post('/log-login', (req, res) => {
@@ -122,6 +273,7 @@ router.post('/log-login', (req, res) => {
 router.get('/login-logs', adminAuth, (req, res) => {
   try {
     console.log('收到管理员日志查询请求');
+    console.log('认证管理员:', req.admin);
     
     ensureLogDirectoryExists();
     
@@ -143,7 +295,11 @@ router.get('/login-logs', adminAuth, (req, res) => {
     logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     
     console.log('认证成功，返回日志条目数:', logs.length);
-    res.status(200).json({ success: true, logs });
+    res.status(200).json({ 
+      success: true, 
+      logs,
+      admin: req.admin
+    });
   } catch (error) {
     console.error('获取登录日志错误:', error);
     res.status(500).json({ 

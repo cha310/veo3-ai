@@ -111,13 +111,57 @@ export const apiService = {
     }
   },
   
-  // 获取登录日志
-  getLoginLogs: async (password: string) => {
+  // 管理员登录 (新方法)
+  adminLogin: async (username: string, password: string) => {
+    try {
+      const response = await retryRequest({ 
+        method: 'post', 
+        url: '/api/auth/admin-login',
+        data: { username, password }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('管理员登录失败:', error);
+      throw error;
+    }
+  },
+  
+  // 获取登录日志 (支持用户名和密码)
+  getLoginLogs: async (usernameOrPassword: string, password?: string) => {
+    try {
+      // 如果提供了两个参数，则第一个是用户名，第二个是密码
+      if (password) {
+        const response = await retryRequest({ 
+          method: 'get', 
+          url: `/api/auth/login-logs`, 
+          data: { username: usernameOrPassword, password }
+        });
+        return response.data;
+      } 
+      // 如果只提供了一个参数，则它是密码（兼容旧方式）
+      else {
+        const response = await retryRequest({ 
+          method: 'get', 
+          url: `/api/auth/login-logs`, 
+          params: { password: usernameOrPassword }
+        });
+        return response.data;
+      }
+    } catch (error) {
+      console.error('获取登录日志失败:', error);
+      throw error;
+    }
+  },
+  
+  // 使用令牌获取登录日志 (新方法)
+  getLoginLogsWithToken: async (token: string) => {
     try {
       const response = await retryRequest({ 
         method: 'get', 
-        url: `/api/auth/login-logs`, 
-        params: { password } 
+        url: `/api/auth/login-logs`,
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       return response.data;
     } catch (error) {

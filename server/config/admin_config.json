@@ -1,0 +1,23 @@
+{
+  "admins": [
+    {
+      "id": "1",
+      "username": "admin",
+      "passwordHash": "109909e1269946acd9784d1c3720ba6c19b6ba643c097558ce45768d3ae0a6c4",
+      "displayName": "系统管理员",
+      "role": "super_admin",
+      "createdAt": "2025-06-10T09:48:40.449Z",
+      "lastLogin": "2025-06-10T09:49:58.105Z"
+    }
+  ],
+  "security": {
+    "tokenExpiresIn": 24,
+    "maxLoginAttempts": 5,
+    "lockoutDuration": 30,
+    "enable2FA": false
+  },
+  "audit": {
+    "enableAuditLog": true,
+    "enableLoginLog": true
+  }
+}

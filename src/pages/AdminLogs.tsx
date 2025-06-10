@@ -11,9 +11,18 @@ interface LoginLog {
   ipAddress: string;
 }
 
+interface Admin {
+  id: string;
+  username: string;
+  displayName: string;
+  role: string;
+}
+
 const AdminLogs: React.FC = () => {
   const [logs, setLogs] = useState<LoginLog[]>([]);
+  const [username, setUsername] = useState('admin'); // 默认用户名
   const [password, setPassword] = useState('');
+  const [admin, setAdmin] = useState<Admin | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -90,7 +99,7 @@ const AdminLogs: React.FC = () => {
     setError('');
     
     try {
-      console.log('正在尝试登录，密码:', password);
+      console.log('正在尝试登录，用户名:', username, '密码长度:', password.length);
       
       // 先测试连接
       try {
@@ -102,17 +111,49 @@ const AdminLogs: React.FC = () => {
         }
       }
       
-      const data = await apiService.getLoginLogs(password);
-      
-      if (data.success) {
-        setLogs(data.logs);
-        setIsAuthenticated(true);
+      // 调用管理员登录API
+      try {
+        const loginResult = await apiService.adminLogin(username, password);
         
-        // 保存认证状态到 sessionStorage
-        sessionStorage.setItem('adminAuthenticated', 'true');
-        sessionStorage.setItem('adminPassword', password);
-      } else {
-        throw new Error(data.message || '认证失败');
+        if (loginResult.success) {
+          setAdmin(loginResult.admin);
+          const data = await apiService.getLoginLogs(username, password);
+          
+          if (data.success) {
+            setLogs(data.logs);
+            setIsAuthenticated(true);
+            
+            // 保存认证状态到 sessionStorage
+            sessionStorage.setItem('adminAuthenticated', 'true');
+            sessionStorage.setItem('adminUsername', username);
+            sessionStorage.setItem('adminPassword', password);
+            sessionStorage.setItem('adminToken', loginResult.token);
+          } else {
+            throw new Error(data.message || '获取日志失败');
+          }
+        } else {
+          throw new Error(loginResult.message || '登录失败');
+        }
+      } catch (loginErr: any) {
+        // 尝试使用旧方式登录（仅密码）
+        const data = await apiService.getLoginLogs(password);
+        
+        if (data.success) {
+          setLogs(data.logs);
+          setIsAuthenticated(true);
+          setAdmin(data.admin || { 
+            id: '1', 
+            username: 'admin', 
+            displayName: '系统管理员', 
+            role: 'super_admin' 
+          });
+          
+          // 保存认证状态到 sessionStorage
+          sessionStorage.setItem('adminAuthenticated', 'true');
+          sessionStorage.setItem('adminPassword', password);
+        } else {
+          throw loginErr; // 两种方式都失败，抛出原始登录错误
+        }
       }
     } catch (err: any) {
       console.error('获取日志失败:', err);
@@ -120,7 +161,7 @@ const AdminLogs: React.FC = () => {
       if (err.message === 'Network Error') {
         setError('网络连接错误，请确保服务器正在运行 (http://localhost:9000)');
       } else if (err.response?.status === 401) {
-        setError('管理员密码错误，请重试');
+        setError('管理员身份验证失败，请检查用户名和密码');
       } else if (err.response?.status === 500) {
         setError('服务器内部错误，请联系技术支持');
       } else {
@@ -131,7 +172,9 @@ const AdminLogs: React.FC = () => {
       
       // 清除认证状态
       sessionStorage.removeItem('adminAuthenticated');
+      sessionStorage.removeItem('adminUsername');
       sessionStorage.removeItem('adminPassword');
+      sessionStorage.removeItem('adminToken');
     } finally {
       setLoading(false);
     }
@@ -140,28 +183,47 @@ const AdminLogs: React.FC = () => {
   // 检查是否已认证
   useEffect(() => {
     const authenticated = sessionStorage.getItem('adminAuthenticated') === 'true';
+    const savedUsername = sessionStorage.getItem('adminUsername') || 'admin';
     const savedPassword = sessionStorage.getItem('adminPassword');
+    const savedToken = sessionStorage.getItem('adminToken');
     
-    if (authenticated && savedPassword) {
+    if (authenticated && (savedPassword || savedToken)) {
       setIsAuthenticated(true);
-      setPassword(savedPassword);
+      setUsername(savedUsername);
+      if (savedPassword) setPassword(savedPassword);
       
       // 自动获取日志
       (async () => {
         setLoading(true);
         try {
-          const data = await apiService.getLoginLogs(savedPassword);
+          let data;
+          if (savedToken) {
+            data = await apiService.getLoginLogsWithToken(savedToken);
+          } else {
+            data = await apiService.getLoginLogs(savedUsername, savedPassword);
+          }
+          
           if (data.success) {
             setLogs(data.logs);
+            setAdmin(data.admin || { 
+              id: '1', 
+              username: savedUsername, 
+              displayName: '系统管理员', 
+              role: 'super_admin' 
+            });
           } else {
             setIsAuthenticated(false);
             sessionStorage.removeItem('adminAuthenticated');
+            sessionStorage.removeItem('adminUsername');
             sessionStorage.removeItem('adminPassword');
+            sessionStorage.removeItem('adminToken');
           }
         } catch (err) {
           setIsAuthenticated(false);
           sessionStorage.removeItem('adminAuthenticated');
+          sessionStorage.removeItem('adminUsername');
           sessionStorage.removeItem('adminPassword');
+          sessionStorage.removeItem('adminToken');
         } finally {
           setLoading(false);
         }
@@ -192,8 +254,11 @@ const AdminLogs: React.FC = () => {
   // 处理退出登录
   const handleLogout = () => {
     setIsAuthenticated(false);
+    setAdmin(null);
     sessionStorage.removeItem('adminAuthenticated');
+    sessionStorage.removeItem('adminUsername');
     sessionStorage.removeItem('adminPassword');
+    sessionStorage.removeItem('adminToken');
   };
 
   return (
@@ -255,7 +320,18 @@ const AdminLogs: React.FC = () => {
             )}
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
-                <label className="block text-gray-300 mb-2">管理员密码</label>
+                <label className="block text-gray-300 mb-2">用户名</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full bg-[#252a37] border border-[#343a4d] rounded-lg py-3 px-4 text-white placeholder-gray-500"
+                  placeholder="请输入管理员用户名"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-gray-300 mb-2">密码</label>
                 <input
                   type="password"
                   value={password}
@@ -277,7 +353,14 @@ const AdminLogs: React.FC = () => {
         ) : (
           <div className="bg-[#1a1e27] rounded-xl p-6 shadow-lg">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold">用户登录记录</h2>
+              <div>
+                <h2 className="text-xl font-semibold">用户登录记录</h2>
+                {admin && (
+                  <p className="text-sm text-gray-400 mt-1">
+                    登录身份: {admin.displayName} ({admin.username})
+                  </p>
+                )}
+              </div>
               <button
                 onClick={handleLogout}
                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm"
