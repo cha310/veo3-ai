@@ -158,7 +158,7 @@ pm2 logs veo3-server
 ```bash
 tail -f /var/log/nginx/veo3-ai.error.log
 pm2 logs veo3-server
-```
+``` 
 
 ## 管理员功能
 

@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const fs = require('fs');
 
 // 加载环境变量
 dotenv.config();
@@ -9,19 +10,70 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 9000;
 
+// 确保日志目录存在
+const logDir = path.join(__dirname, 'logs');
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir, { recursive: true });
+  console.log('已创建日志目录:', logDir);
+}
+
 // 详细的CORS配置
 const corsOptions = {
-  origin: ['http://localhost:5173', 'http://localhost:9000', 'https://www.veo3-ai.net'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+  origin: function(origin, callback) {
+    // 允许所有来源，包括没有origin的请求
+    console.log('CORS请求来源:', origin || '同源请求');
+    callback(null, true);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'Access-Control-Allow-Origin', 'Origin', 'Accept'],
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  preflightContinue: false,
+  maxAge: 86400 // 预检请求缓存24小时
 };
 
 // 中间件
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// 错误处理中间件
+app.use((err, req, res, next) => {
+  console.error('服务器错误:', err.stack);
+  res.status(500).json({
+    success: false,
+    message: '服务器内部错误',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+// 请求记录中间件
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  const logData = {
+    timestamp,
+    method: req.method,
+    url: req.url,
+    ip: req.ip || req.connection.remoteAddress,
+    userAgent: req.headers['user-agent']
+  };
+  
+  console.log(`${timestamp} - ${req.method} ${req.url}`);
+  
+  // 保存请求详细信息到日志
+  if (req.method !== 'OPTIONS') {
+    const requestLogPath = path.join(logDir, 'requests.log');
+    fs.appendFile(
+      requestLogPath, 
+      JSON.stringify(logData) + '\n',
+      (err) => {
+        if (err) console.error('写入请求日志失败:', err);
+      }
+    );
+  }
+  
+  next();
+});
 
 // 导入路由
 const authRoutes = require('./routes/auth');
@@ -36,15 +88,20 @@ app.use(express.static(distPath));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 
-// 打印所有请求的日志
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  next();
-});
-
 // 添加健康检查端点
 app.get('/health', (req, res) => {
   res.status(200).send('服务器正常运行');
+});
+
+// 404处理
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ 
+      success: false, 
+      message: '请求的API端点不存在' 
+    });
+  }
+  next();
 });
 
 // 所有路由请求转发到前端
