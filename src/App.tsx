@@ -14,6 +14,7 @@ import TermsOfService from './pages/TermsOfService';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import RefundPolicy from './pages/RefundPolicy';
 import AIFrenchKissing from './pages/AIFrenchKissing';
+import AdminLogs from './pages/AdminLogs';
 import CanonicalHead from './components/CanonicalHead';
 
 // Google OAuth 客户端ID
@@ -45,6 +46,7 @@ function App() {
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/refund-policy" element={<RefundPolicy />} />
             <Route path="/ai-french-kissing" element={<AIFrenchKissing />} />
+            <Route path="/admin-logs" element={<AdminLogs />} />
           </Routes>
         </div>
       </BrowserRouter>

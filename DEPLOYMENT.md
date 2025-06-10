@@ -158,4 +158,20 @@ pm2 logs veo3-server
 ```bash
 tail -f /var/log/nginx/veo3-ai.error.log
 pm2 logs veo3-server
-``` 
+```
+
+## 管理员功能
+
+### 用户登录记录
+
+系统会自动记录用户登录信息，包括邮箱、名称、头像、登录时间、IP地址和浏览器信息。
+
+管理员可以通过访问 `/admin-logs` 页面，输入管理员密码（默认为 `veoai-admin-2024`）来查看所有用户的登录记录。
+
+如需修改管理员密码，请在服务器的环境变量中设置 `ADMIN_PASSWORD`。
+
+### 日志数据存储
+
+用户登录信息存储在 `server/logs/login_logs.json` 文件中。这些数据只能通过管理员面板访问，普通用户无法查看。
+
+如果需要备份登录数据，可以直接复制该JSON文件。 

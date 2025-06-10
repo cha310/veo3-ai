@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Modal from 'react-modal';
 import { useGoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
+import axios from 'axios';
 
 // 不要在这里设置AppElement，因为在服务器渲染时会出错
 
@@ -21,11 +22,42 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
   const [loginError, setLoginError] = useState('');
   const [email, setEmail] = useState('');
   
+  // API基础URL
+  const API_BASE_URL = 'http://localhost:9000'; // 开发环境
+  // const API_BASE_URL = ''; // 生产环境使用相对路径
+  
   // 在组件挂载时设置Modal的appElement
   useEffect(() => {
     // 确保Modal可访问性，在客户端执行
     Modal.setAppElement('#root');
   }, []);
+  
+  // 记录用户登录信息
+  const logUserLogin = async (userData: any) => {
+    try {
+      console.log('记录用户登录信息:', userData);
+      
+      // 尝试测试API连接
+      try {
+        const healthResponse = await axios.get(`${API_BASE_URL}/health`);
+        console.log('健康检查响应:', healthResponse.data);
+      } catch (healthError) {
+        console.error('健康检查失败:', healthError);
+      }
+      
+      // 发送实际请求
+      const response = await axios.post(`${API_BASE_URL}/api/auth/log-login`, {
+        email: userData.email,
+        name: userData.name,
+        picture: userData.picture,
+      });
+      console.log('用户登录信息记录成功, 响应:', response.data);
+    } catch (error: any) {
+      console.error('记录登录信息错误:', error);
+      console.error('错误详情:', error.response?.data || error.message);
+      // 不阻止用户继续使用，只记录错误
+    }
+  };
   
   // 使用Google登录
   const googleLogin = useGoogleLogin({
@@ -54,6 +86,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
           ...userInfo,
           credits: 0 // 默认积分为0
         };
+        
+        // 记录用户登录信息
+        await logUserLogin(userData);
         
         localStorage.setItem('user', JSON.stringify(userData));
         onRequestClose();
