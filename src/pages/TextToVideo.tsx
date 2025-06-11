@@ -128,7 +128,7 @@ const TextToVideo: React.FC = () => {
   const [videoDuration, setVideoDuration] = useState<5 | 8>(8);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<AIModel>(availableModels[0]); // 默认选择第一个模型
+  const [selectedModel, setSelectedModel] = useState<AIModel>(availableModels[2]); // 默认选择VEO3模型
 
   // 用户积分状态
   const [userCredits, setUserCredits] = useState<number>(0);

@@ -5,6 +5,7 @@ import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import VideoGallery from './components/VideoGallery';
 import Features from './components/Features';
+import HowToCreate from './components/HowToCreate';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import VideoEffects from './pages/VideoEffects';
@@ -34,6 +35,7 @@ function App() {
                   <Hero />
                   <VideoGallery />
                   <Features />
+                  <HowToCreate />
                   <FAQ />
                 </main>
                 <Footer />

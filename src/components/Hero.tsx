@@ -58,18 +58,14 @@ const Hero: React.FC = () => {
           <p className="text-lg sm:text-xl text-gray-300 mb-8 leading-relaxed max-w-[65ch] mx-auto">
             Veo3 AI, the latest breakthrough from Google Veo. With Veo3 AI, generate videos featuring synchronized sound, dialogue, and music—all from a simple prompt. Create cinematic scenes, lifelike characters, and dynamic animations powered by Veo3 AI's advanced tracking, native audio, and realistic physics. Integrated with Imagen 4 and Flow, Veo3 AI transforms your creative vision into stunning reality.
           </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
+          <div className="flex justify-center">
             <Link 
               to="/create-video" 
-              className="px-8 py-3 rounded-lg bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white font-medium hover:shadow-lg hover:shadow-[#8A7CFF]/20 transition-all"
+              className="relative px-10 py-4 text-lg rounded-lg font-medium text-white overflow-hidden group bg-[#6C5CE7] transition-all duration-300 hover:shadow-[0_0_25px_rgba(138,124,255,0.7)] hover:-translate-y-1"
             >
-              Try Now
-            </Link>
-            <Link 
-              to="/video-effects" 
-              className="px-8 py-3 rounded-lg bg-[#2C3640] text-white font-medium hover:bg-[#3A444E] transition-colors"
-            >
-              Videos
+              <span className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] transition-all duration-300 group-hover:scale-[1.15] group-hover:rotate-[4deg]"></span>
+              <span className="absolute top-0 left-0 w-full h-full bg-gradient-to-tr from-[#6C5CE7]/0 via-white/5 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+              <span className="relative z-10">Try Now</span>
             </Link>
           </div>
         </div>
