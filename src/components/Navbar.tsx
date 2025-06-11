@@ -56,12 +56,29 @@ const Navbar: React.FC = () => {
 
   // 检查Supabase认证状态
   useEffect(() => {
+    console.log('Supabase认证状态检查 - supabaseUser:', supabaseUser);
+    
+    // 每次检查都尝试重新获取会话，以确保状态最新
+    const refreshAuthStatus = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          console.log('发现有效会话:', session.user);
+        }
+      } catch (err) {
+        console.error('获取会话错误:', err);
+      }
+    };
+    
+    refreshAuthStatus();
+    
     if (supabaseUser) {
       console.log('Supabase用户已登录:', supabaseUser);
       
       // 从Supabase获取用户资料
       const fetchUserProfile = async () => {
         try {
+          // 首先尝试从users表获取资料
           const { data, error } = await supabase
             .from('users')
             .select('*')
@@ -70,18 +87,52 @@ const Navbar: React.FC = () => {
           
           if (error) {
             console.error('获取用户资料失败:', error);
+            
+            // 如果从表中获取失败，直接使用Supabase Auth用户信息
+            const userData = {
+              id: supabaseUser.id,
+              email: supabaseUser.email || '',
+              name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
+              picture: supabaseUser.user_metadata?.avatar_url,
+              credits: 0
+            };
+            
+            console.log('使用Auth用户信息:', userData);
+            setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData));
+            
+            // 尝试创建用户记录
+            const { error: insertError } = await supabase
+              .from('users')
+              .insert([{
+                id: supabaseUser.id,
+                email: supabaseUser.email,
+                name: userData.name,
+                avatar_url: userData.picture,
+                provider: 'google',
+                credits: 0,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }]);
+            
+            if (insertError) {
+              console.error('创建用户记录失败:', insertError);
+            }
+            
             return;
           }
           
           if (data) {
             // 确保本地用户数据与Supabase保持同步
             const updatedUserData = {
-              email: supabaseUser.email || '',
-              name: data.name || supabaseUser.user_metadata?.name,
+              id: supabaseUser.id,
+              email: supabaseUser.email || data.email || '',
+              name: data.name || supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
               picture: data.avatar_url || supabaseUser.user_metadata?.avatar_url,
               credits: data.credits || 0
             };
             
+            console.log('使用数据库用户信息:', updatedUserData);
             setUser(updatedUserData);
             localStorage.setItem('user', JSON.stringify(updatedUserData));
           }
@@ -91,6 +142,15 @@ const Navbar: React.FC = () => {
       };
       
       fetchUserProfile();
+    } else {
+      // 检查localStorage是否有用户信息，但Supabase认证已失效
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        // 存在不一致状态，清除本地存储
+        console.log('检测到不一致状态：本地有用户数据但Supabase无认证');
+        localStorage.removeItem('user');
+        setUser(null);
+      }
     }
   }, [supabaseUser]);
 
@@ -217,10 +277,14 @@ const Navbar: React.FC = () => {
           </Link>
           
           {/* 登录按钮或用户头像 */}
-          {user ? (
+          {supabaseUser || user ? (
             <div className="flex items-center">
               {renderUserCredits()}
-              <UserMenu userData={user} />
+              <UserMenu userData={user || {
+                email: supabaseUser?.email || 'unknown',
+                name: supabaseUser?.user_metadata?.name || supabaseUser?.email?.split('@')[0] || 'User',
+                picture: supabaseUser?.user_metadata?.avatar_url
+              }} />
             </div>
           ) : (
             <button
@@ -236,7 +300,7 @@ const Navbar: React.FC = () => {
         <div className="md:hidden flex items-center">
           {user && renderUserCredits()}
           
-          <button
+          <button 
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="text-white p-2 focus:outline-none"
           >
@@ -246,18 +310,18 @@ const Navbar: React.FC = () => {
       </nav>
 
       {/* Mobile menu */}
-      {isMenuOpen && (
+        {isMenuOpen && (
         <div className="md:hidden bg-[#1a1e27] shadow-lg">
           <div className="px-4 pt-2 pb-4 space-y-4">
-            <Link 
-              to="/" 
+              <Link 
+                to="/" 
               className={`block py-2 ${
                 isHomePage ? 'text-[#8A7CFF] font-medium' : 'text-white'
-              }`}
+                }`}
               onClick={() => setIsMenuOpen(false)}
-            >
-              Home
-            </Link>
+              >
+                Home
+              </Link>
             <div>
               <div 
                 onClick={() => {
@@ -271,8 +335,8 @@ const Navbar: React.FC = () => {
                 AI Tools
               </div>
             </div>
-            <Link 
-              to="/video-effects" 
+              <Link 
+                to="/video-effects" 
               className={`block py-2 ${
                 isVideoEffectsPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
               }`}
@@ -344,18 +408,18 @@ const Navbar: React.FC = () => {
                   setIsMenuOpen(false);
                 }}
                 className="block w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity mt-4"
-              >
+                >
                 Login
-              </button>
-            )}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* 登录模态框 */}
-      <LoginModal 
-        isOpen={isLoginModalOpen} 
-        onRequestClose={() => setIsLoginModalOpen(false)} 
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onRequestClose={() => setIsLoginModalOpen(false)}
       />
     </header>
   );

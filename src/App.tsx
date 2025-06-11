@@ -28,23 +28,23 @@ function App() {
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <SupabaseAuthProvider>
         <BrowserRouter>
-          <CanonicalHead baseUrl="https://www.veo3-ai.net" />
-          <div className="min-h-screen bg-[#121a22]">
-            <Routes>
-              <Route path="/" element={
-                <>
-                  <Navbar />
-                  <main>
-                    <Hero />
-                    <VideoGallery />
-                    <Features />
+        <CanonicalHead baseUrl="https://www.veo3-ai.net" />
+        <div className="min-h-screen bg-[#121a22]">
+          <Routes>
+            <Route path="/" element={
+              <>
+                <Navbar />
+                <main>
+                  <Hero />
+                  <VideoGallery />
+                  <Features />
                     <HowToCreate />
-                    <FAQ />
-                  </main>
-                  <Footer />
-                </>
-              } />
-              <Route path="/video-effects" element={<VideoEffects />} />
+                  <FAQ />
+                </main>
+                <Footer />
+              </>
+            } />
+            <Route path="/video-effects" element={<VideoEffects />} />
               <Route path="/create-video" element={<TextToVideo />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
@@ -53,8 +53,8 @@ function App() {
               <Route path="/ai-french-kissing" element={<AIFrenchKissing />} />
               <Route path="/admin-logs" element={<AdminLogs />} />
               <Route path="/debug" element={<DebugPage />} />
-            </Routes>
-          </div>
+          </Routes>
+        </div>
         </BrowserRouter>
       </SupabaseAuthProvider>
     </GoogleOAuthProvider>

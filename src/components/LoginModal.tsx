@@ -5,6 +5,7 @@ import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 import supabase from '../lib/supabase.ts';
 import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
+import { signInWithGoogleToken, signInWithEmail, logLogin } from '../services/auth';
 
 // 不要在这里设置AppElement，因为在服务器渲染时会出错
 
@@ -26,9 +27,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const { user, signIn } = useSupabaseAuth();
   
-  // API基础URL
-  const API_BASE_URL = 'http://localhost:9000'; // 开发环境
-  // const API_BASE_URL = ''; // 生产环境使用相对路径
+  // API基础URL - 动态获取当前域名
+  const API_BASE_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:9000' // 开发环境
+    : ''; // 生产环境使用相对路径
   
   // 在组件挂载时设置Modal的appElement
   useEffect(() => {
@@ -75,147 +77,46 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
     onSuccess: async (codeResponse) => {
       setIsLoading(true);
       try {
-        // 获取用户信息
-        const userInfoResponse = await fetch(
-          'https://www.googleapis.com/oauth2/v3/userinfo',
-          {
-            headers: {
-              Authorization: `Bearer ${codeResponse.access_token}`,
-            },
+        console.log('Google登录成功，获取到访问令牌');
+        
+        // 使用我们自定义的服务来处理Google登录
+        const result = await signInWithGoogleToken(codeResponse.access_token);
+        
+        // 显示成功消息
+        if (result.needsEmailVerification) {
+          alert(result.message);
+          onRequestClose();
+        } else {
+          console.log('登录成功，准备更新UI');
+          
+          // 关闭登录模态框
+          onRequestClose();
+          
+          // 记录登录信息到传统服务器（如果需要）
+          if (result.user) {
+            await logUserLogin({
+              email: result.user.email,
+              name: result.user.name,
+              picture: result.user.picture
+            });
           }
-        );
-        
-        const userInfo = await userInfoResponse.json();
-        
-        // 检查是否为谷歌邮箱
-        if (!userInfo.email.endsWith('@gmail.com')) {
-          setLoginError('Only Google Gmail can be used to register');
-          setIsLoading(false);
-          return;
+          
+          // 不需要在这里处理重定向，因为auth.ts中已经做了处理
+          // 即：登录成功后，auth.ts会负责重定向到正确的URL
         }
-        
-        console.log('Google用户信息:', userInfo);
-        
-        // 使用Supabase进行OAuth登录
-        const { data: supabaseAuthData, error: supabaseAuthError } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: window.location.origin,
-          }
-        });
-        
-        if (supabaseAuthError) {
-          console.error('Supabase OAuth登录失败:', supabaseAuthError);
-          
-          // 如果OAuth登录失败，尝试使用email登录/注册
-          const { data: emailAuthData, error: emailAuthError } = await supabase.auth.signInWithOtp({
-            email: userInfo.email,
-            options: {
-              emailRedirectTo: window.location.origin,
-            }
-          });
-          
-          if (emailAuthError) {
-            console.error('Supabase邮箱登录失败:', emailAuthError);
-            throw emailAuthError;
-          }
-          
-          // 告知用户检查邮箱
-          alert(`我们已向 ${userInfo.email} 发送了一封包含登录链接的邮件，请查收。`);
-        } else if (supabaseAuthData.url) {
-          // 重定向到Supabase OAuth URL
-          window.location.href = supabaseAuthData.url;
-          return;
-        }
-        
-        // 使用Google信息创建或更新用户资料
-        try {
-          // 获取当前用户ID
-          const { data: { user: currentUser } } = await supabase.auth.getUser();
-          
-          if (currentUser) {
-            // 用户已存在，更新profiles表
-            const { error: upsertError } = await supabase
-              .from('users')
-              .upsert({
-                id: currentUser.id,
-                email: userInfo.email,
-                name: userInfo.name,
-                avatar_url: userInfo.picture,
-                provider: 'google',
-                credits: 0,
-                updated_at: new Date().toISOString()
-              });
-            
-            if (upsertError) {
-              console.error('更新用户资料失败:', upsertError);
-            }
-          }
-        } catch (profileError) {
-          console.error('处理用户资料时出错:', profileError);
-        }
-        
-        // 处理登录成功，添加默认积分字段
-        const userData = {
-          ...userInfo,
-          credits: 0 // 默认积分为0
-        };
-        
-        // 记录用户登录信息到自己的服务器
-        await logUserLogin(userData);
-        
-        // 将用户数据保存到localStorage
-        localStorage.setItem('user', JSON.stringify(userData));
-        
-        // 记录登录日志
-        try {
-          // 获取当前登录的Supabase用户
-          const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-          
-          if (supabaseUser) {
-            // 获取IP地址
-            const ipAddress = await getIpAddress();
-            
-            // 记录登录日志
-            const { error: logError } = await supabase
-              .from('login_logs')
-              .insert([
-                {
-                  user_id: supabaseUser.id,
-                  ip_address: ipAddress,
-                  user_agent: navigator.userAgent,
-                  success: true,
-                  device_type: detectDeviceType(),
-                }
-              ]);
-            
-            if (logError) {
-              console.error('记录登录日志失败:', logError);
-            } else {
-              console.log('登录日志记录成功');
-            }
-          }
-        } catch (logError) {
-          console.error('记录登录日志异常:', logError);
-        }
-        
-        // 关闭模态框
-        onRequestClose();
-        
-        // 刷新页面以更新登录状态
-        window.location.reload();
       } catch (error) {
         console.error('Google login error:', error);
-        setLoginError('Login failed, please try again');
+        setLoginError('登录失败，请重试');
       } finally {
         setIsLoading(false);
       }
     },
     onError: (error) => {
       console.error('Google login error:', error);
-      setLoginError('Login failed, please try again');
+      setLoginError('登录失败，请重试');
       setIsLoading(false);
     },
+    flow: 'implicit', // 使用隐式流程，避免重定向问题
   });
 
   // 使用邮箱继续
@@ -234,9 +135,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
     setIsLoading(true);
     
     try {
-      // 使用Supabase发送登录链接
-      await signIn(email);
-      alert(`我们已向 ${email} 发送了一封包含登录链接的邮件，请查收。`);
+      // 使用我们自定义的服务来处理邮箱登录
+      const result = await signInWithEmail(email);
+      alert(result.message);
       onRequestClose();
     } catch (error) {
       console.error('发送登录链接失败:', error);

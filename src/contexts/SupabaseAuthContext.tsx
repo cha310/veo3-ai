@@ -89,9 +89,13 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       
       // 清除本地存储
       localStorage.removeItem('user');
+      localStorage.removeItem('googleUserInfo'); // 确保清除所有可能的用户数据
       
-      // 重新加载页面以确保状态一致
-      window.location.reload();
+      // 重定向到当前域名，而不是刷新页面
+      // 这可以确保在生产环境中不会重定向到localhost
+      const currentOrigin = window.location.origin;
+      console.log('登出后重定向到:', currentOrigin);
+      window.location.href = currentOrigin;
     } catch (error) {
       console.error('登出错误:', error);
       throw error;
