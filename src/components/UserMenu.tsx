@@ -1,13 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
+import { LogOut, User, Settings, UserIcon } from 'lucide-react';
+
+interface UserData {
+  id?: string;
+  name?: string;
+  email: string;
+  picture?: string;
+  credits?: number;
+}
 
 interface UserMenuProps {
-  userData: {
-    name?: string;
-    picture?: string;
-    email: string;
-    credits?: number;
-  };
+  userData: UserData;
 }
 
 const UserMenu: React.FC<UserMenuProps> = ({ userData }) => {
@@ -38,9 +42,10 @@ const UserMenu: React.FC<UserMenuProps> = ({ userData }) => {
   const handleSignOut = async () => {
     try {
       await signOut();
+      setIsOpen(false);
       // 注意：登出后页面会自动刷新，这是在signOut函数中处理的
     } catch (error) {
-      console.error('登出失败:', error);
+      console.error('登出错误:', error);
     }
   };
   

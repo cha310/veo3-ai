@@ -1,94 +1,201 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
 import supabase from '../lib/supabase.ts';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
-export default function DebugPage() {
-  const [result, setResult] = useState<any>(null);
+const DebugPage: React.FC = () => {
+  const { user, session, refreshSession } = useSupabaseAuth();
+  const [localStorageData, setLocalStorageData] = useState<any>(null);
+  const [cookieData, setCookieData] = useState<string>('');
+  const [sessionData, setSessionData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
 
-  const testSupabase = async () => {
+  // 获取本地存储数据
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        setLocalStorageData(JSON.parse(userData));
+      } catch (e) {
+        setLocalStorageData({ error: '无法解析本地存储数据' });
+      }
+    } else {
+      setLocalStorageData({ message: '本地存储中没有用户数据' });
+    }
+
+    // 获取Cookie
+    setCookieData(document.cookie);
+  }, [user, session]);
+
+  // 获取会话数据
+  useEffect(() => {
+    const getSessionData = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          setSessionData({ error: error.message });
+        } else {
+          setSessionData(data);
+        }
+      } catch (err) {
+        setSessionData({ error: '获取会话时出错' });
+      }
+    };
+
+    getSessionData();
+  }, [user, session]);
+
+  // 刷新会话
+  const handleRefreshSession = async () => {
     setLoading(true);
-    setError(null);
-    
+    setMessage('正在刷新会话...');
     try {
-      // 测试连接
-      const { data: tableData, error: tableError } = await supabase
-        .from('login_logs')
-        .select('*')
-        .limit(5);
-      
-      if (tableError) {
-        throw tableError;
-      }
-      
-      // 测试插入
-      const testData = {
-        user_id: 'test-user-' + Date.now(),
-        ip_address: '127.0.0.1',
-        user_agent: navigator.userAgent,
-        device_type: 'browser',
-        success: true
-      };
-      
-      const { data: insertData, error: insertError } = await supabase
-        .from('login_logs')
-        .insert([testData])
-        .select();
-      
-      if (insertError) {
-        throw insertError;
-      }
-      
-      setResult({
-        existingData: tableData,
-        insertedData: insertData
-      });
-    } catch (err: any) {
-      console.error('Supabase测试错误:', err);
-      setError(err.message || '未知错误');
+      await refreshSession();
+      setMessage('会话刷新成功');
+    } catch (error) {
+      setMessage(`会话刷新失败: ${error}`);
     } finally {
       setLoading(false);
     }
   };
 
+  // 测试Google登录
+  const handleTestGoogleLogin = async () => {
+    setLoading(true);
+    setMessage('开始Google登录测试...');
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/debug',
+        },
+      });
+      
+      if (error) {
+        setMessage(`登录错误: ${error.message}`);
+      } else {
+        setMessage('正在重定向到Google...');
+      }
+    } catch (error) {
+      setMessage(`登录异常: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 登出
+  const handleSignOut = async () => {
+    setLoading(true);
+    setMessage('正在登出...');
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        setMessage(`登出错误: ${error.message}`);
+      } else {
+        setMessage('登出成功');
+        // 刷新页面
+        window.location.reload();
+      }
+    } catch (error) {
+      setMessage(`登出异常: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 清除本地存储
+  const handleClearLocalStorage = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('googleUserInfo');
+    setLocalStorageData({ message: '本地存储已清除' });
+    setMessage('本地存储已清除');
+  };
+
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Supabase调试页面</h1>
-      
-      <button
-        onClick={testSupabase}
-        disabled={loading}
-        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
-      >
-        {loading ? '测试中...' : '测试Supabase连接'}
-      </button>
-      
-      {error && (
-        <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-          <p className="font-bold">错误:</p>
-          <p>{error}</p>
-        </div>
-      )}
-      
-      {result && (
-        <div className="mt-4">
-          <h2 className="text-xl font-semibold mb-2">测试结果:</h2>
+    <>
+      <Navbar />
+      <div className="min-h-screen bg-[#121a22] text-white pt-20 pb-10">
+        <div className="max-w-4xl mx-auto px-4">
+          <h1 className="text-3xl font-bold mb-8">身份验证调试</h1>
           
-          <div className="mb-4">
-            <h3 className="text-lg font-medium mb-2">现有数据:</h3>
-            <pre className="bg-gray-100 p-4 rounded overflow-auto max-h-40">
-              {JSON.stringify(result.existingData, null, 2)}
-            </pre>
+          {message && (
+            <div className="bg-blue-900 p-4 rounded-lg mb-6">
+              <p>{message}</p>
+            </div>
+          )}
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div className="bg-[#1a1e27] p-6 rounded-lg">
+              <h2 className="text-xl font-bold mb-4">用户状态</h2>
+              <p className="mb-2">登录状态: <span className="font-bold">{user ? '已登录' : '未登录'}</span></p>
+              <p className="mb-2">用户邮箱: <span className="font-bold">{user?.email || '无'}</span></p>
+              <p className="mb-2">用户ID: <span className="font-bold">{user?.id || '无'}</span></p>
+              <p className="mb-2">会话有效: <span className="font-bold">{session ? '是' : '否'}</span></p>
+            </div>
+            
+            <div className="bg-[#1a1e27] p-6 rounded-lg">
+              <h2 className="text-xl font-bold mb-4">操作</h2>
+              <div className="flex flex-col space-y-3">
+                <button 
+                  onClick={handleRefreshSession}
+                  disabled={loading}
+                  className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md disabled:opacity-50"
+                >
+                  刷新会话
+                </button>
+                <button 
+                  onClick={handleTestGoogleLogin}
+                  disabled={loading}
+                  className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-md disabled:opacity-50"
+                >
+                  测试Google登录
+                </button>
+                <button 
+                  onClick={handleSignOut}
+                  disabled={loading || !user}
+                  className="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-md disabled:opacity-50"
+                >
+                  登出
+                </button>
+                <button 
+                  onClick={handleClearLocalStorage}
+                  className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-md"
+                >
+                  清除本地存储
+                </button>
+              </div>
+            </div>
           </div>
           
-          <div>
-            <h3 className="text-lg font-medium mb-2">插入的数据:</h3>
-            <pre className="bg-gray-100 p-4 rounded overflow-auto max-h-40">
-              {JSON.stringify(result.insertedData, null, 2)}
-            </pre>
+          <div className="space-y-6">
+            <div className="bg-[#1a1e27] p-6 rounded-lg">
+              <h2 className="text-xl font-bold mb-4">本地存储数据</h2>
+              <pre className="bg-[#0d1117] p-4 rounded-md overflow-auto max-h-48">
+                {JSON.stringify(localStorageData, null, 2)}
+              </pre>
+            </div>
+            
+            <div className="bg-[#1a1e27] p-6 rounded-lg">
+              <h2 className="text-xl font-bold mb-4">Cookie 数据</h2>
+              <pre className="bg-[#0d1117] p-4 rounded-md overflow-auto max-h-48">
+                {cookieData || '无Cookie数据'}
+              </pre>
+            </div>
+            
+            <div className="bg-[#1a1e27] p-6 rounded-lg">
+              <h2 className="text-xl font-bold mb-4">会话数据</h2>
+              <pre className="bg-[#0d1117] p-4 rounded-md overflow-auto max-h-96">
+                {JSON.stringify(sessionData, null, 2)}
+              </pre>
+            </div>
           </div>
         </div>
-      )}
-    </div>
+      </div>
+      <Footer />
+    </>
   );
-} 
+};
+
+export default DebugPage; 

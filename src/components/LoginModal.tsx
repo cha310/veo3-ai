@@ -25,7 +25,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
   const [loginError, setLoginError] = useState('');
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { user, signIn } = useSupabaseAuth();
+  const { user, signIn, signInWithGoogle } = useSupabaseAuth();
   
   // API基础URL - 动态获取当前域名
   const API_BASE_URL = window.location.hostname === 'localhost' 
@@ -118,6 +118,19 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
     },
     flow: 'implicit', // 使用隐式流程，避免重定向问题
   });
+
+  // 使用Supabase的Google OAuth登录
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    try {
+      console.log('开始Supabase Google OAuth登录流程');
+      await signInWithGoogle();
+    } catch (error) {
+      console.error('Google登录错误:', error);
+      setLoginError('登录失败，请重试');
+      setIsLoading(false);
+    }
+  };
 
   // 使用邮箱继续
   const handleContinue = async () => {
@@ -236,9 +249,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
           <div className="flex-grow h-px bg-[#343a4d]"></div>
         </div>
 
-        {/* Google登录按钮 */}
+        {/* Google登录按钮 - 使用Supabase OAuth方式 */}
         <button
-          onClick={() => googleLogin()}
+          onClick={handleGoogleLogin}
           disabled={isLoading}
           className="w-full flex items-center justify-center gap-3 bg-[#1a1e27] border border-[#343a4d] hover:bg-[#252a37] text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
         >
@@ -265,15 +278,19 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
         </button>
 
         {/* 登录链接 */}
-        <div className="mt-6 text-center text-sm">
-          <p className="text-gray-400">
-            Already have an account?{' '}
-            <a href="#" className="text-[#e6436d] hover:underline">
-              Log in here
+        <div className="text-center mt-6">
+          <p className="text-gray-400 text-sm">
+            By signing up, you agree to our{' '}
+            <a href="/terms-of-service" className="text-[#8A7CFF] hover:underline">
+              Terms of Service
+            </a>{' '}
+            and{' '}
+            <a href="/privacy-policy" className="text-[#8A7CFF] hover:underline">
+              Privacy Policy
             </a>
+            .
           </p>
         </div>
-
       </div>
     </Modal>
   );

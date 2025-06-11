@@ -7,6 +7,7 @@ import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
 import supabase from '../lib/supabase.ts';
 
 interface UserData {
+  id?: string;
   name?: string;
   email: string;
   picture?: string;
@@ -20,7 +21,7 @@ const Navbar: React.FC = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
-  const { user: supabaseUser } = useSupabaseAuth();
+  const { user: supabaseUser, session } = useSupabaseAuth();
 
   const toolsMenuRef = useRef<HTMLDivElement>(null);
 
@@ -43,7 +44,9 @@ const Navbar: React.FC = () => {
     const userData = localStorage.getItem('user');
     if (userData) {
       try {
-        setUser(JSON.parse(userData));
+        const parsedUser = JSON.parse(userData);
+        console.log('从本地存储加载用户数据:', parsedUser);
+        setUser(parsedUser);
       } catch (error) {
         console.error('解析用户数据错误:', error);
         localStorage.removeItem('user');
@@ -57,6 +60,7 @@ const Navbar: React.FC = () => {
   // 检查Supabase认证状态
   useEffect(() => {
     console.log('Supabase认证状态检查 - supabaseUser:', supabaseUser);
+    console.log('Supabase会话状态:', session);
     
     // 每次检查都尝试重新获取会话，以确保状态最新
     const refreshAuthStatus = async () => {
@@ -64,6 +68,14 @@ const Navbar: React.FC = () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           console.log('发现有效会话:', session.user);
+        } else {
+          console.log('未找到有效会话');
+          // 如果没有有效会话但本地存储有用户数据，清除本地存储
+          if (localStorage.getItem('user')) {
+            console.log('清除本地存储的用户数据');
+            localStorage.removeItem('user');
+            setUser(null);
+          }
         }
       } catch (err) {
         console.error('获取会话错误:', err);
@@ -152,7 +164,7 @@ const Navbar: React.FC = () => {
         setUser(null);
       }
     }
-  }, [supabaseUser]);
+  }, [supabaseUser, session]);
 
   // 显示用户积分
   const renderUserCredits = () => {
@@ -175,125 +187,168 @@ const Navbar: React.FC = () => {
     setIsMenuOpen(false);
   };
 
-  return (
-    <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? 'bg-[#121a22]/95 backdrop-blur-md shadow-md' : 'bg-[#121a22]'
-      }`}
-    >
-      <nav className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-        <div className="flex items-center">
-          <Link to="/">
-          <img src="/VEOAI2.svg" alt="Veo3 AI Logo" className="h-6 w-auto" />
-          </Link>
-        </div>
+  // 使用useEffect来调试登录状态
+  useEffect(() => {
+    console.log('当前登录状态 - supabaseUser:', supabaseUser);
+    console.log('当前登录状态 - user:', user);
+    console.log('当前会话状态 - session:', session);
+  }, [supabaseUser, user, session]);
 
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center space-x-8">
-          <Link 
-            to="/" 
-            className={`transition-colors py-1.5 ${
-              isHomePage 
-                ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
-                : 'text-white hover:text-[#8A7CFF]'
-            }`}
-          >
-            Home
+  // 处理登录
+  const handleLogin = () => {
+    console.log('点击登录按钮');
+    setIsLoginModalOpen(true);
+  };
+
+  // 处理登出
+  const handleLogout = async () => {
+    console.log('点击登出按钮');
+    try {
+      const { signOut } = useSupabaseAuth();
+      await signOut();
+    } catch (error) {
+      console.error('登出错误:', error);
+    }
+  };
+
+  // 检查是否真正登录
+  const isLoggedIn = Boolean(supabaseUser && session);
+  console.log('登录状态检查 - isLoggedIn:', isLoggedIn);
+
+  // 在Navbar组件内添加定期的会话检查
+  useEffect(() => {
+    // 在Navbar组件内添加定期的会话检查
+    const checkSession = async () => {
+      try {
+        console.log('Navbar组件定期检查会话状态...');
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('获取会话错误:', error);
+          return;
+        }
+        
+        const currentSession = data.session;
+        console.log('当前会话状态:', currentSession ? '有效' : '无效', currentSession?.user?.id);
+        
+        // 如果会话有效但UI没有显示已登录，则更新UI
+        if (currentSession && !isLoggedIn) {
+          console.log('检测到会话有效但UI未更新，强制更新UI');
+          setUser({
+            id: currentSession.user.id,
+            email: currentSession.user.email || '',
+            name: currentSession.user.user_metadata?.name || currentSession.user.email?.split('@')[0] || 'User',
+            picture: currentSession.user.user_metadata?.avatar_url,
+            credits: 0
+          });
+          window.location.reload(); // 刷新页面确保所有组件更新状态
+        }
+        
+        // 如果会话无效但UI显示已登录，则清除状态
+        if (!currentSession && isLoggedIn) {
+          console.log('检测到会话无效但UI显示已登录，清除状态');
+          setUser(null);
+          localStorage.removeItem('user');
+          localStorage.removeItem('googleUserInfo');
+        }
+      } catch (err) {
+        console.error('检查会话错误:', err);
+      }
+    };
+    
+    // 组件挂载时立即检查一次
+    checkSession();
+    
+    // 每30秒检查一次会话状态
+    const sessionCheckInterval = setInterval(checkSession, 30000);
+    
+    // 清理定时器
+    return () => clearInterval(sessionCheckInterval);
+  }, [isLoggedIn]); // 依赖于isLoggedIn，当登录状态变化时重新设置检查
+
+  return (
+    <header className={`fixed top-0 left-0 right-0 z-30 transition-all duration-300 ${isScrolled ? 'bg-[#0c111b] shadow-md py-2' : 'bg-transparent py-4'}`}>
+      <nav className="max-w-7xl mx-auto px-4 flex justify-between items-center">
+        <div className="flex items-center">
+          <Link to="/" className="text-white text-xl font-bold mr-10">
+            VEO<span className="text-[#8A7CFF]">AI</span>
           </Link>
           
-          {/* AI Tools 下拉菜单 - 鼠标悬浮 */}
-          <div 
-            className="relative group"
-            onMouseEnter={() => setIsToolsMenuOpen(true)}
-            onMouseLeave={() => {
-              // 添加延迟，防止鼠标移动过程中菜单立即消失
-              setTimeout(() => {
-                if (!toolsMenuRef.current?.matches(':hover')) {
-                  setIsToolsMenuOpen(false);
-                }
-              }, 100);
-            }}
-          >
-            {/* 无论如何，只要URL是/create-video，就强制使用紫色渐变，但要确保图标可见 */}
-            <div className="flex items-center transition-colors py-1.5 cursor-pointer">
-              <span className={isCreateVideoPage 
-                ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
-                : 'text-white'
-              }>
-                AI Tools
-              </span>
-              <ChevronDown 
-                size={16} 
-                className={`ml-1 transition-transform ${
-                  isToolsMenuOpen ? 'rotate-180' : ''
-                } ${
-                  isCreateVideoPage ? 'text-[#8A7CFF]' : 'text-white'
-                }`} 
-              />
+          <div className="hidden md:flex items-center space-x-6">
+            <div className="relative group">
+              <div
+                className="flex items-center text-white hover:text-[#8A7CFF] cursor-pointer"
+                onMouseEnter={() => setIsToolsMenuOpen(true)}
+                onMouseLeave={() => setIsToolsMenuOpen(false)}
+              >
+                <span className="mr-1">AI Tools</span>
+                <ChevronDown size={16} />
+              </div>
+              
+              <div 
+                ref={toolsMenuRef}
+                className={`absolute top-full left-0 mt-1 bg-[#1a1e27] rounded-lg shadow-lg py-2 w-48 z-10 transition-opacity duration-150 ${
+                  isToolsMenuOpen ? 'opacity-100' : 'opacity-0 invisible group-hover:opacity-100 group-hover:visible'
+                }`}
+                onMouseEnter={() => setIsToolsMenuOpen(true)}
+                onMouseLeave={() => setIsToolsMenuOpen(false)}
+              >
+                <a 
+                  href="/create-video"
+                  onClick={(e) => handleNavigate(e, '/create-video')}
+                  className={`flex items-center px-4 py-2 text-sm ${
+                    isCreateVideoPage ? 'text-[#8A7CFF]' : 'text-white'
+                  } hover:bg-[#252a37] transition-colors`}
+                >
+                  <div className="flex items-center justify-center w-7 h-7 rounded-md bg-[#2A3541] mr-2">
+                    <Video size={14} className="text-[#8A7CFF]" />
+                  </div>
+                  <span>Video Generator</span>
+                </a>
+              </div>
             </div>
             
-            <div 
-              ref={toolsMenuRef}
-              className={`absolute top-full left-0 mt-1 bg-[#1a1e27] rounded-lg shadow-lg py-2 w-48 z-10 transition-opacity duration-150 ${
-                isToolsMenuOpen ? 'opacity-100' : 'opacity-0 invisible group-hover:opacity-100 group-hover:visible'
+            <Link 
+              to="/video-effects" 
+              className={`transition-colors py-1.5 ${
+                isVideoEffectsPage 
+                  ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
+                  : 'text-white hover:text-[#8A7CFF]'
               }`}
-              onMouseEnter={() => setIsToolsMenuOpen(true)}
-              onMouseLeave={() => setIsToolsMenuOpen(false)}
             >
-              <a 
-                href="/create-video"
-                onClick={(e) => handleNavigate(e, '/create-video')}
-                className={`flex items-center px-4 py-2 text-sm ${
-                  isCreateVideoPage ? 'text-[#8A7CFF]' : 'text-white'
-                } hover:bg-[#252a37] transition-colors`}
+              Video Effects
+            </Link>
+            <Link 
+              to="/pricing" 
+              className={`transition-colors py-1.5 ${
+                isPricingPage 
+                  ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
+                  : 'text-white hover:text-[#8A7CFF]'
+              }`}
+            >
+              Pricing
+            </Link>
+            
+            {/* 登录按钮或用户头像 */}
+            {isLoggedIn ? (
+              <div className="flex items-center">
+                {renderUserCredits()}
+                <UserMenu userData={user || {
+                  id: supabaseUser?.id,
+                  email: supabaseUser?.email || 'unknown',
+                  name: supabaseUser?.user_metadata?.name || supabaseUser?.email?.split('@')[0] || 'User',
+                  picture: supabaseUser?.user_metadata?.avatar_url
+                }} />
+              </div>
+            ) : (
+              <button
+                onClick={handleLogin}
+                className="bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
               >
-                <div className="flex items-center justify-center w-7 h-7 rounded-md bg-[#2A3541] mr-2">
-                  <Video size={14} className="text-[#8A7CFF]" />
-                </div>
-                <span>Video Generator</span>
-              </a>
-            </div>
+                Login
+              </button>
+            )}
           </div>
-          
-          <Link 
-            to="/video-effects" 
-            className={`transition-colors py-1.5 ${
-              isVideoEffectsPage 
-                ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
-                : 'text-white hover:text-[#8A7CFF]'
-            }`}
-          >
-            Video Effects
-          </Link>
-          <Link 
-            to="/pricing" 
-            className={`transition-colors py-1.5 ${
-              isPricingPage 
-                ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
-                : 'text-white hover:text-[#8A7CFF]'
-            }`}
-          >
-            Pricing
-          </Link>
-          
-          {/* 登录按钮或用户头像 */}
-          {supabaseUser || user ? (
-            <div className="flex items-center">
-              {renderUserCredits()}
-              <UserMenu userData={user || {
-                email: supabaseUser?.email || 'unknown',
-                name: supabaseUser?.user_metadata?.name || supabaseUser?.email?.split('@')[0] || 'User',
-                picture: supabaseUser?.user_metadata?.avatar_url
-              }} />
-            </div>
-          ) : (
-            <button
-              onClick={() => setIsLoginModalOpen(true)}
-              className="bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
-            >
-              Login
-            </button>
-          )}
         </div>
 
         {/* Mobile menu button */}
@@ -355,11 +410,11 @@ const Navbar: React.FC = () => {
             </Link>
             
             {/* 移动端登录/用户菜单 */}
-            {user ? (
+            {isLoggedIn ? (
               <div className="border-t border-[#343a4d] pt-4 mt-4">
                 <div className="flex items-center mb-4">
                   <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
-                    {user.picture ? (
+                    {user?.picture ? (
                       <img src={user.picture} alt={user.name || 'User'} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-[#343a4d] flex items-center justify-center">
@@ -368,8 +423,8 @@ const Navbar: React.FC = () => {
                     )}
                   </div>
                   <div>
-                    <div className="text-white font-medium">{user.name || user.email.split('@')[0]}</div>
-                    <div className="text-gray-400 text-sm">{user.email}</div>
+                    <div className="text-white font-medium">{user?.name || supabaseUser?.email?.split('@')[0] || 'User'}</div>
+                    <div className="text-gray-400 text-sm">{user?.email || supabaseUser?.email || ''}</div>
                   </div>
                 </div>
                 
@@ -391,9 +446,7 @@ const Navbar: React.FC = () => {
                 
                 <button 
                   onClick={() => {
-                    // 使用Supabase Auth Context的登出功能
-                    const { signOut } = useSupabaseAuth();
-                    signOut();
+                    handleLogout();
                     setIsMenuOpen(false);
                   }}
                   className="block py-2 text-red-400 w-full text-left"
@@ -408,10 +461,10 @@ const Navbar: React.FC = () => {
                   setIsMenuOpen(false);
                 }}
                 className="block w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity mt-4"
-                >
+              >
                 Login
-                </button>
-              )}
+              </button>
+            )}
             </div>
           </div>
         )}
