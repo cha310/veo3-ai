@@ -3,6 +3,8 @@ import Modal from 'react-modal';
 import { useGoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
+import supabase from '../lib/supabase.ts';
+import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
 
 // 不要在这里设置AppElement，因为在服务器渲染时会出错
 
@@ -21,6 +23,8 @@ interface GoogleUserData {
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
   const [loginError, setLoginError] = useState('');
   const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { user, signIn } = useSupabaseAuth();
   
   // API基础URL
   const API_BASE_URL = 'http://localhost:9000'; // 开发环境
@@ -31,6 +35,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
     // 确保Modal可访问性，在客户端执行
     Modal.setAppElement('#root');
   }, []);
+
+  // 如果用户已登录，关闭模态框
+  useEffect(() => {
+    if (user) {
+      onRequestClose();
+    }
+  }, [user, onRequestClose]);
   
   // 记录用户登录信息
   const logUserLogin = async (userData: any) => {
@@ -62,6 +73,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
   // 使用Google登录
   const googleLogin = useGoogleLogin({
     onSuccess: async (codeResponse) => {
+      setIsLoading(true);
       try {
         // 获取用户信息
         const userInfoResponse = await fetch(
@@ -78,7 +90,69 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
         // 检查是否为谷歌邮箱
         if (!userInfo.email.endsWith('@gmail.com')) {
           setLoginError('Only Google Gmail can be used to register');
+          setIsLoading(false);
           return;
+        }
+        
+        console.log('Google用户信息:', userInfo);
+        
+        // 使用Supabase进行OAuth登录
+        const { data: supabaseAuthData, error: supabaseAuthError } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin,
+          }
+        });
+        
+        if (supabaseAuthError) {
+          console.error('Supabase OAuth登录失败:', supabaseAuthError);
+          
+          // 如果OAuth登录失败，尝试使用email登录/注册
+          const { data: emailAuthData, error: emailAuthError } = await supabase.auth.signInWithOtp({
+            email: userInfo.email,
+            options: {
+              emailRedirectTo: window.location.origin,
+            }
+          });
+          
+          if (emailAuthError) {
+            console.error('Supabase邮箱登录失败:', emailAuthError);
+            throw emailAuthError;
+          }
+          
+          // 告知用户检查邮箱
+          alert(`我们已向 ${userInfo.email} 发送了一封包含登录链接的邮件，请查收。`);
+        } else if (supabaseAuthData.url) {
+          // 重定向到Supabase OAuth URL
+          window.location.href = supabaseAuthData.url;
+          return;
+        }
+        
+        // 使用Google信息创建或更新用户资料
+        try {
+          // 获取当前用户ID
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          
+          if (currentUser) {
+            // 用户已存在，更新profiles表
+            const { error: upsertError } = await supabase
+              .from('users')
+              .upsert({
+                id: currentUser.id,
+                email: userInfo.email,
+                name: userInfo.name,
+                avatar_url: userInfo.picture,
+                provider: 'google',
+                credits: 0,
+                updated_at: new Date().toISOString()
+              });
+            
+            if (upsertError) {
+              console.error('更新用户资料失败:', upsertError);
+            }
+          }
+        } catch (profileError) {
+          console.error('处理用户资料时出错:', profileError);
         }
         
         // 处理登录成功，添加默认积分字段
@@ -87,25 +161,65 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
           credits: 0 // 默认积分为0
         };
         
-        // 记录用户登录信息
+        // 记录用户登录信息到自己的服务器
         await logUserLogin(userData);
         
+        // 将用户数据保存到localStorage
         localStorage.setItem('user', JSON.stringify(userData));
+        
+        // 记录登录日志
+        try {
+          // 获取当前登录的Supabase用户
+          const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+          
+          if (supabaseUser) {
+            // 获取IP地址
+            const ipAddress = await getIpAddress();
+            
+            // 记录登录日志
+            const { error: logError } = await supabase
+              .from('login_logs')
+              .insert([
+                {
+                  user_id: supabaseUser.id,
+                  ip_address: ipAddress,
+                  user_agent: navigator.userAgent,
+                  success: true,
+                  device_type: detectDeviceType(),
+                }
+              ]);
+            
+            if (logError) {
+              console.error('记录登录日志失败:', logError);
+            } else {
+              console.log('登录日志记录成功');
+            }
+          }
+        } catch (logError) {
+          console.error('记录登录日志异常:', logError);
+        }
+        
+        // 关闭模态框
         onRequestClose();
-        window.location.reload(); // 刷新页面以更新登录状态
+        
+        // 刷新页面以更新登录状态
+        window.location.reload();
       } catch (error) {
         console.error('Google login error:', error);
         setLoginError('Login failed, please try again');
+      } finally {
+        setIsLoading(false);
       }
     },
     onError: (error) => {
       console.error('Google login error:', error);
       setLoginError('Login failed, please try again');
+      setIsLoading(false);
     },
   });
 
   // 使用邮箱继续
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!email.trim()) {
       setLoginError('Please enter your email address');
       return;
@@ -117,8 +231,43 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
       return;
     }
     
-    // 执行谷歌登录
-    googleLogin();
+    setIsLoading(true);
+    
+    try {
+      // 使用Supabase发送登录链接
+      await signIn(email);
+      alert(`我们已向 ${email} 发送了一封包含登录链接的邮件，请查收。`);
+      onRequestClose();
+    } catch (error) {
+      console.error('发送登录链接失败:', error);
+      setLoginError('Failed to send login link, please try again');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 设备类型检测函数
+  const detectDeviceType = () => {
+    const userAgent = navigator.userAgent;
+    if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(userAgent)) {
+      return 'tablet';
+    }
+    if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(userAgent)) {
+      return 'mobile';
+    }
+    return 'desktop';
+  };
+
+  // 获取IP地址函数
+  const getIpAddress = async () => {
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      return data.ip;
+    } catch (error) {
+      console.error('Failed to get IP:', error);
+      return 'unknown';
+    }
   };
 
   return (
@@ -135,6 +284,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
         <button 
           onClick={onRequestClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-white"
+          disabled={isLoading}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -158,6 +308,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full bg-[#252a37] border border-[#343a4d] rounded-lg py-3 px-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]"
             placeholder="Email"
+            disabled={isLoading}
           />
         </div>
 
@@ -172,8 +323,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
         <button
           onClick={handleContinue}
           className="w-full bg-[#373d4f] hover:bg-[#444a5f] text-white font-medium py-3 px-4 rounded-lg transition-colors mb-4"
+          disabled={isLoading}
         >
-          Continue
+          {isLoading ? '处理中...' : '继续'}
         </button>
 
         {/* 分隔线 */}
@@ -186,7 +338,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
         {/* Google登录按钮 */}
         <button
           onClick={() => googleLogin()}
-          className="w-full flex items-center justify-center gap-3 bg-[#1a1e27] border border-[#343a4d] hover:bg-[#252a37] text-white font-medium py-3 px-4 rounded-lg transition-colors"
+          disabled={isLoading}
+          className="w-full flex items-center justify-center gap-3 bg-[#1a1e27] border border-[#343a4d] hover:bg-[#252a37] text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
         >
           <svg width="20" height="20" viewBox="0 0 24 24">
             <path
@@ -206,7 +359,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
             />
           </svg>
-          Continue with Google 
+          {isLoading ? '处理中...' : '使用Google继续'} 
           <span className="text-gray-500">→</span>
         </button>
 

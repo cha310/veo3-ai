@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>API测试</title>
+  <script>
+    async function testConnection() {
+      try {
+        const response = await fetch('http://localhost:9000/health');
+        const text = await response.text();
+        document.getElementById('result').textContent = '连接成功: ' + text;
+      } catch (error) {
+        document.getElementById('result').textContent = '连接失败: ' + error.message;
+        console.error('Error:', error);
+      }
+    }
+  </script>
+</head>
+<body>
+  <h1>API连接测试</h1>
+  <button onclick="testConnection()">测试连接</button>
+  <div id="result" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;"></div>
+</body>
+</html> 

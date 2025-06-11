@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Menu, X, LogIn, LogOut, User, CreditCard, ChevronDown, Video } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import LoginModal from './LoginModal';
+import UserMenu from './UserMenu';
+import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
+import supabase from '../lib/supabase.ts';
 
 interface UserData {
   name?: string;
@@ -16,8 +19,8 @@ const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
+  const { user: supabaseUser } = useSupabaseAuth();
 
   const toolsMenuRef = useRef<HTMLDivElement>(null);
 
@@ -51,13 +54,45 @@ const Navbar: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // 处理登出
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    setUser(null);
-    setIsUserMenuOpen(false);
-    window.location.reload();
-  };
+  // 检查Supabase认证状态
+  useEffect(() => {
+    if (supabaseUser) {
+      console.log('Supabase用户已登录:', supabaseUser);
+      
+      // 从Supabase获取用户资料
+      const fetchUserProfile = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', supabaseUser.id)
+            .single();
+          
+          if (error) {
+            console.error('获取用户资料失败:', error);
+            return;
+          }
+          
+          if (data) {
+            // 确保本地用户数据与Supabase保持同步
+            const updatedUserData = {
+              email: supabaseUser.email || '',
+              name: data.name || supabaseUser.user_metadata?.name,
+              picture: data.avatar_url || supabaseUser.user_metadata?.avatar_url,
+              credits: data.credits || 0
+            };
+            
+            setUser(updatedUserData);
+            localStorage.setItem('user', JSON.stringify(updatedUserData));
+          }
+        } catch (error) {
+          console.error('获取用户资料异常:', error);
+        }
+      };
+      
+      fetchUserProfile();
+    }
+  }, [supabaseUser]);
 
   // 显示用户积分
   const renderUserCredits = () => {
@@ -185,199 +220,142 @@ const Navbar: React.FC = () => {
           {user ? (
             <div className="flex items-center">
               {renderUserCredits()}
-              <div className="relative">
-                <button 
-                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center space-x-2 focus:outline-none"
-                >
-                  <div className="w-8 h-8 rounded-full overflow-hidden">
-                    {user.picture ? (
-                      <img 
-                        src={user.picture} 
-                        alt={user.name || 'User'} 
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-[#6C5CE7] flex items-center justify-center text-white">
-                        <User size={16} />
-                      </div>
-                    )}
-                  </div>
-                </button>
-                
-                {/* 用户下拉菜单 */}
-                {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-[#1a1e27] rounded-lg shadow-lg py-2 z-10">
-                    <div className="px-4 py-2 border-b border-gray-700">
-                      <p className="text-sm font-medium text-white truncate">{user.name || 'User'}</p>
-                      <p className="text-xs text-gray-400 truncate">{user.email}</p>
-                      <div className="flex items-center mt-1">
-                        <CreditCard size={14} className="text-[#8A7CFF] mr-1" />
-                        <p className="text-xs text-[#8A7CFF]">{user.credits || 0} credits</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-sm text-white hover:bg-[#252a37] flex items-center space-x-2"
-                    >
-                      <LogOut size={16} />
-                      <span>Log out</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+              <UserMenu userData={user} />
             </div>
           ) : (
             <button
               onClick={() => setIsLoginModalOpen(true)}
-              className="px-4 py-1.5 bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white rounded-lg hover:shadow-lg hover:shadow-[#8A7CFF]/20 transition-all flex items-center gap-2"
+              className="bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
             >
-              <span>Login</span>
+              Login
             </button>
           )}
         </div>
 
-        {/* Mobile Menu Button */}
+        {/* Mobile menu button */}
         <div className="md:hidden flex items-center">
-          {user ? (
-            <>
-              {renderUserCredits()}
-              <button 
-                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="mr-3"
-              >
-                <div className="w-8 h-8 rounded-full overflow-hidden">
-                  {user.picture ? (
-                    <img 
-                      src={user.picture} 
-                      alt={user.name || 'User'} 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-[#6C5CE7] flex items-center justify-center text-white">
-                      <User size={16} />
-                    </div>
-                  )}
-                </div>
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => setIsLoginModalOpen(true)}
-              className="mr-3 p-1.5 bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white rounded-lg hover:shadow-lg hover:shadow-[#8A7CFF]/20 transition-all"
-            >
-              <LogIn size={18} />
-            </button>
-          )}
+          {user && renderUserCredits()}
           
-          <button 
+          <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="text-white hover:text-[#8A7CFF] transition-colors"
+            className="text-white p-2 focus:outline-none"
           >
             {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
-
-        {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="absolute top-full left-0 right-0 bg-[#121a22] shadow-lg md:hidden py-4">
-            <div className="flex flex-col space-y-4 px-4">
-              <Link 
-                to="/" 
-                className={`transition-colors ${
-                  isHomePage 
-                    ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
-                    : 'text-white hover:text-[#8A7CFF]'
-                }`}
-              >
-                Home
-              </Link>
-              
-              {/* 移动端 AI Tools 菜单 */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className={isCreateVideoPage ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' : 'text-white'}>AI Tools</span>
-                  <ChevronDown size={14} className={isCreateVideoPage ? 'text-[#8A7CFF]' : 'text-white'} />
-                </div>
-                <div className="pl-4 border-l border-gray-700 space-y-2">
-                  <a 
-                    href="/create-video"
-                    onClick={(e) => handleNavigate(e, '/create-video')}
-                    className={`flex items-center text-sm ${
-                      isCreateVideoPage 
-                        ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
-                        : 'text-white hover:text-[#8A7CFF]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-center w-6 h-6 rounded-md bg-[#2A3541] mr-2">
-                      <Video size={12} className="text-[#8A7CFF]" />
-                    </div>
-                    <span>Video Generator</span>
-                  </a>
-                </div>
-              </div>
-              
-              <Link 
-                to="/video-effects" 
-                className={`transition-colors ${
-                  isVideoEffectsPage 
-                    ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
-                    : 'text-white hover:text-[#8A7CFF]'
-                }`}
-              >
-                Video Effects
-              </Link>
-              <Link 
-                to="/pricing" 
-                className={`transition-colors ${
-                  isPricingPage 
-                    ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
-                    : 'text-white hover:text-[#8A7CFF]'
-                }`}
-              >
-                Pricing
-              </Link>
-              
-              {/* 移动端登出选项 */}
-              {user && (
-                <button
-                  onClick={handleLogout}
-                  className="text-left text-white hover:text-[#8A7CFF] flex items-center space-x-2"
-                >
-                  <LogOut size={16} />
-                  <span>Log out</span>
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {/* 用户菜单（移动端） */}
-        {isUserMenuOpen && user && (
-          <div className="absolute top-full right-4 mt-2 w-48 bg-[#1a1e27] rounded-lg shadow-lg py-2 z-10 md:hidden">
-            <div className="px-4 py-2 border-b border-gray-700">
-              <p className="text-sm font-medium text-white truncate">{user.name || 'User'}</p>
-              <p className="text-xs text-gray-400 truncate">{user.email}</p>
-              <div className="flex items-center mt-1">
-                <CreditCard size={14} className="text-[#8A7CFF] mr-1" />
-                <p className="text-xs text-[#8A7CFF]">{user.credits || 0} credits</p>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="w-full text-left px-4 py-2 text-sm text-white hover:bg-[#252a37] flex items-center space-x-2"
-            >
-              <LogOut size={16} />
-              <span>Log out</span>
-            </button>
-          </div>
-        )}
       </nav>
 
+      {/* Mobile menu */}
+      {isMenuOpen && (
+        <div className="md:hidden bg-[#1a1e27] shadow-lg">
+          <div className="px-4 pt-2 pb-4 space-y-4">
+            <Link 
+              to="/" 
+              className={`block py-2 ${
+                isHomePage ? 'text-[#8A7CFF] font-medium' : 'text-white'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Home
+            </Link>
+            <div>
+              <div 
+                onClick={() => {
+                  window.location.href = '/create-video';
+                  setIsMenuOpen(false);
+                }}
+                className={`block py-2 ${
+                  isCreateVideoPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
+                }`}
+              >
+                AI Tools
+              </div>
+            </div>
+            <Link 
+              to="/video-effects" 
+              className={`block py-2 ${
+                isVideoEffectsPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Video Effects
+            </Link>
+            <Link 
+              to="/pricing" 
+              className={`block py-2 ${
+                isPricingPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Pricing
+            </Link>
+            
+            {/* 移动端登录/用户菜单 */}
+            {user ? (
+              <div className="border-t border-[#343a4d] pt-4 mt-4">
+                <div className="flex items-center mb-4">
+                  <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                    {user.picture ? (
+                      <img src={user.picture} alt={user.name || 'User'} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-[#343a4d] flex items-center justify-center">
+                        <User size={20} className="text-white" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-white font-medium">{user.name || user.email.split('@')[0]}</div>
+                    <div className="text-gray-400 text-sm">{user.email}</div>
+                  </div>
+                </div>
+                
+                <Link 
+                  to="/profile" 
+                  className="block py-2 text-white"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Profile
+                </Link>
+                
+                <Link 
+                  to="/settings" 
+                  className="block py-2 text-white"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Settings
+                </Link>
+                
+                <button 
+                  onClick={() => {
+                    // 使用Supabase Auth Context的登出功能
+                    const { signOut } = useSupabaseAuth();
+                    signOut();
+                    setIsMenuOpen(false);
+                  }}
+                  className="block py-2 text-red-400 w-full text-left"
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setIsLoginModalOpen(true);
+                  setIsMenuOpen(false);
+                }}
+                className="block w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity mt-4"
+              >
+                Login
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 登录模态框 */}
-      <LoginModal
-        isOpen={isLoginModalOpen}
-        onRequestClose={() => setIsLoginModalOpen(false)}
+      <LoginModal 
+        isOpen={isLoginModalOpen} 
+        onRequestClose={() => setIsLoginModalOpen(false)} 
       />
     </header>
   );
