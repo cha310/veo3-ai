@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
-import supabase from '../lib/supabase.ts';
+import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 const DebugPage: React.FC = () => {
-  const { user, session, refreshSession } = useSupabaseAuth();
+  const session = useSession();
+  const supabase = useSupabaseClient();
   const [localStorageData, setLocalStorageData] = useState<any>(null);
   const [cookieData, setCookieData] = useState<string>('');
   const [sessionData, setSessionData] = useState<any>(null);
@@ -27,7 +27,7 @@ const DebugPage: React.FC = () => {
 
     // 获取Cookie
     setCookieData(document.cookie);
-  }, [user, session]);
+  }, [session]);
 
   // 获取会话数据
   useEffect(() => {
@@ -45,17 +45,22 @@ const DebugPage: React.FC = () => {
     };
 
     getSessionData();
-  }, [user, session]);
+  }, [session, supabase.auth]);
 
   // 刷新会话
   const handleRefreshSession = async () => {
     setLoading(true);
     setMessage('正在刷新会话...');
     try {
-      await refreshSession();
-      setMessage('会话刷新成功');
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error) {
+        setMessage(`会话刷新失败: ${error.message}`);
+      } else {
+        setMessage('会话刷新成功');
+        setSessionData(data);
+      }
     } catch (error) {
-      setMessage(`会话刷新失败: ${error}`);
+      setMessage(`会话刷新异常: ${error}`);
     } finally {
       setLoading(false);
     }
@@ -129,9 +134,9 @@ const DebugPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div className="bg-[#1a1e27] p-6 rounded-lg">
               <h2 className="text-xl font-bold mb-4">用户状态</h2>
-              <p className="mb-2">登录状态: <span className="font-bold">{user ? '已登录' : '未登录'}</span></p>
-              <p className="mb-2">用户邮箱: <span className="font-bold">{user?.email || '无'}</span></p>
-              <p className="mb-2">用户ID: <span className="font-bold">{user?.id || '无'}</span></p>
+              <p className="mb-2">登录状态: <span className="font-bold">{session ? '已登录' : '未登录'}</span></p>
+              <p className="mb-2">用户邮箱: <span className="font-bold">{session?.user?.email || '无'}</span></p>
+              <p className="mb-2">用户ID: <span className="font-bold">{session?.user?.id || '无'}</span></p>
               <p className="mb-2">会话有效: <span className="font-bold">{session ? '是' : '否'}</span></p>
             </div>
             
@@ -154,7 +159,7 @@ const DebugPage: React.FC = () => {
                 </button>
                 <button 
                   onClick={handleSignOut}
-                  disabled={loading || !user}
+                  disabled={loading || !session}
                   className="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-md disabled:opacity-50"
                 >
                   登出

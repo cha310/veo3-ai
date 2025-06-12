@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, LogOut, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import supabase from '../lib/supabase.ts';
 
 export interface UserData {
   id?: string;

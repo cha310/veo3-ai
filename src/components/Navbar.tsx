@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, X, LogIn, LogOut, User, CreditCard, ChevronDown, Video } from 'lucide-react';
+import { Menu, X, CreditCard, ChevronDown, Video, User } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
-import LoginModal from './LoginModal';
 import UserMenu from './UserMenu';
-import supabase from '../lib/supabase.ts';
 
 interface UserData {
   id?: string;
@@ -19,7 +17,6 @@ const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
   
@@ -34,7 +31,6 @@ const Navbar: React.FC = () => {
   const isVideoEffectsPage = location.pathname === '/video-effects';
   const isPricingPage = location.pathname === '/pricing';
   const isCreateVideoPage = location.pathname === '/create-video';
-  const isLoginPage = location.pathname === '/login';
 
   // 处理滚动效果
   useEffect(() => {
@@ -127,15 +123,6 @@ const Navbar: React.FC = () => {
         <span className="text-[#8A7CFF] font-medium">{user.credits || 0}</span>
       </div>
     );
-  };
-
-  // 处理页面跳转并滚动到顶部
-  const handleNavigate = (event: React.MouseEvent<HTMLAnchorElement>, path: string) => {
-    event.preventDefault();
-    navigate(path);
-    window.scrollTo(0, 0);
-    setIsToolsMenuOpen(false);
-    setIsMenuOpen(false);
   };
 
   // 处理登录
