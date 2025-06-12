@@ -1,52 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import Modal from 'react-modal';
-import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { X } from 'lucide-react';
+import { useSupabaseClient, useSession } from '@supabase/auth-helpers-react';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
-// 不要在这里设置AppElement，因为在服务器渲染时会出错
-
-interface LoginModalProps {
-  isOpen: boolean;
-  onRequestClose: () => void;
-}
-
-const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
-  const [error, setError] = useState<string | null>(null);
+const LoginPage = () => {
   const supabaseClient = useSupabaseClient();
+  const session = useSession();
+  const navigate = useNavigate();
 
+  // 如果已登录，重定向到首页
   useEffect(() => {
-    // 重置错误状态
-    if (isOpen) {
-      setError(null);
+    if (session) {
+      navigate('/');
     }
-  }, [isOpen]);
+  }, [session, navigate]);
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onRequestClose={onRequestClose}
-      className="fixed inset-0 flex items-center justify-center p-4 z-50"
-      overlayClassName="fixed inset-0 bg-black bg-opacity-75 z-40"
-      contentLabel="Login Modal"
-    >
-      <div className="bg-[#1a1e27] rounded-lg shadow-xl w-full max-w-md relative">
-        <button
-          onClick={onRequestClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white"
-        >
-          <X size={20} />
-        </button>
-        
-        <div className="p-6">
-          <h2 className="text-2xl font-bold text-white mb-6 text-center">登录/注册</h2>
-          
-          {error && (
-            <div className="bg-red-500 bg-opacity-20 border border-red-500 text-red-300 p-3 rounded mb-4">
-              {error}
-            </div>
-          )}
+    <>
+      <Navbar />
+      <div className="min-h-screen bg-[#121a22] text-white pt-20 pb-10">
+        <div className="max-w-md mx-auto p-6 bg-[#1a1e27] rounded-lg shadow-lg">
+          <h1 className="text-2xl font-bold mb-6 text-center">登录/注册</h1>
           
           <Auth
             supabaseClient={supabaseClient}
@@ -59,6 +36,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
                     brandAccent: '#6C5CE7',
                   },
                 },
+              },
+              className: {
+                container: 'auth-container',
+                button: 'auth-button',
+                input: 'auth-input',
               },
             }}
             providers={['google']}
@@ -96,7 +78,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
               },
             }}
           />
-          
+
           <div className="mt-6 text-center text-sm text-gray-400">
             <p>登录即表示您同意我们的</p>
             <p>
@@ -111,8 +93,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
           </div>
         </div>
       </div>
-    </Modal>
+      <Footer />
+    </>
   );
 };
 
-export default LoginModal; 
+export default LoginPage; 

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { SupabaseAuthProvider } from './contexts/SupabaseAuthContext';
+import { SessionContextProvider } from '@supabase/auth-helpers-react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import VideoGallery from './components/VideoGallery';
@@ -19,10 +19,12 @@ import AIFrenchKissing from './pages/AIFrenchKissing';
 import AdminLogs from './pages/AdminLogs';
 import CanonicalHead from './components/CanonicalHead';
 import DebugPage from './pages/debug';
+import LoginPage from './pages/LoginPage';
 import supabase from './lib/supabase.ts';
 
-// Google OAuth 客户端ID
-const GOOGLE_CLIENT_ID = '1049691614917-7ncrqa4qmmg4oiamn8i1dfbrvphicoju.apps.googleusercontent.com';
+// 从环境变量获取Google OAuth客户端ID
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1049691614917-7ncrqa4qmmg4oiamn8i1dfbrvphicoju.apps.googleusercontent.com';
+const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://www.veo3-ai.net';
 
 function App() {
   // 检查URL中是否包含会话令牌
@@ -33,8 +35,15 @@ function App() {
       
       if (event === 'SIGNED_IN' && session) {
         console.log('用户已登录，存储会话状态 (App级别)');
-        // 可能需要在这里存储用户信息
-        // 这里不刷新页面，因为SupabaseAuthContext已经处理了刷新
+        
+        // 记录基本信息到控制台，帮助调试
+        console.log('当前域名:', window.location.origin);
+        console.log('预期站点URL:', SITE_URL);
+        
+        // 如果URL包含访问令牌，清理URL
+        if (window.location.hash && window.location.hash.includes('access_token')) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
       }
     });
 
@@ -72,25 +81,25 @@ function App() {
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <SupabaseAuthProvider>
+      <SessionContextProvider supabaseClient={supabase}>
         <BrowserRouter>
-        <CanonicalHead baseUrl="https://www.veo3-ai.net" />
-        <div className="min-h-screen bg-[#121a22]">
-          <Routes>
-            <Route path="/" element={
-              <>
-                <Navbar />
-                <main>
-                  <Hero />
-                  <VideoGallery />
-                  <Features />
+          <CanonicalHead baseUrl={SITE_URL} />
+          <div className="min-h-screen bg-[#121a22]">
+            <Routes>
+              <Route path="/" element={
+                <>
+                  <Navbar />
+                  <main>
+                    <Hero />
+                    <VideoGallery />
+                    <Features />
                     <HowToCreate />
-                  <FAQ />
-                </main>
-                <Footer />
-              </>
-            } />
-            <Route path="/video-effects" element={<VideoEffects />} />
+                    <FAQ />
+                  </main>
+                  <Footer />
+                </>
+              } />
+              <Route path="/video-effects" element={<VideoEffects />} />
               <Route path="/create-video" element={<TextToVideo />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
@@ -99,10 +108,11 @@ function App() {
               <Route path="/ai-french-kissing" element={<AIFrenchKissing />} />
               <Route path="/admin-logs" element={<AdminLogs />} />
               <Route path="/debug" element={<DebugPage />} />
-          </Routes>
-        </div>
+              <Route path="/login" element={<LoginPage />} />
+            </Routes>
+          </div>
         </BrowserRouter>
-      </SupabaseAuthProvider>
+      </SessionContextProvider>
     </GoogleOAuthProvider>
   );
 }

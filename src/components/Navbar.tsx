@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, X, LogIn, LogOut, User, CreditCard, ChevronDown, Video } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
 import LoginModal from './LoginModal';
 import UserMenu from './UserMenu';
-import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
 import supabase from '../lib/supabase.ts';
 
 interface UserData {
@@ -16,12 +16,16 @@ interface UserData {
 
 const Navbar: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
-  const { user: supabaseUser, session } = useSupabaseAuth();
+  
+  // 使用Supabase Auth Helpers获取会话
+  const session = useSession();
+  const supabaseClient = useSupabaseClient();
 
   const toolsMenuRef = useRef<HTMLDivElement>(null);
 
@@ -30,7 +34,9 @@ const Navbar: React.FC = () => {
   const isVideoEffectsPage = location.pathname === '/video-effects';
   const isPricingPage = location.pathname === '/pricing';
   const isCreateVideoPage = location.pathname === '/create-video';
+  const isLoginPage = location.pathname === '/login';
 
+  // 处理滚动效果
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 50) {
@@ -40,85 +46,44 @@ const Navbar: React.FC = () => {
       }
     };
 
-    // 检查本地存储中的用户数据
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        console.log('从本地存储加载用户数据:', parsedUser);
-        setUser(parsedUser);
-      } catch (error) {
-        console.error('解析用户数据错误:', error);
-        localStorage.removeItem('user');
-      }
-    }
-
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // 检查Supabase认证状态
+  // 当会话变化时更新用户状态
   useEffect(() => {
-    console.log('Supabase认证状态检查 - supabaseUser:', supabaseUser);
-    console.log('Supabase会话状态:', session);
-    
-    // 每次检查都尝试重新获取会话，以确保状态最新
-    const refreshAuthStatus = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          console.log('发现有效会话:', session.user);
-        } else {
-          console.log('未找到有效会话');
-          // 如果没有有效会话但本地存储有用户数据，清除本地存储
-          if (localStorage.getItem('user')) {
-            console.log('清除本地存储的用户数据');
-            localStorage.removeItem('user');
-            setUser(null);
-          }
-        }
-      } catch (err) {
-        console.error('获取会话错误:', err);
-      }
-    };
-    
-    refreshAuthStatus();
-    
-    if (supabaseUser) {
-      console.log('Supabase用户已登录:', supabaseUser);
-      
-      // 从Supabase获取用户资料
-      const fetchUserProfile = async () => {
+    const updateUserState = async () => {
+      if (session?.user) {
+        console.log('Navbar: 检测到有效会话，用户ID:', session.user.id);
+        
         try {
-          // 首先尝试从users表获取资料
-          const { data, error } = await supabase
+          // 从Supabase获取用户资料
+          const { data, error } = await supabaseClient
             .from('users')
             .select('*')
-            .eq('id', supabaseUser.id)
+            .eq('id', session.user.id)
             .single();
           
           if (error) {
             console.error('获取用户资料失败:', error);
             
-            // 如果从表中获取失败，直接使用Supabase Auth用户信息
-            const userData = {
-              id: supabaseUser.id,
-              email: supabaseUser.email || '',
-              name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
-              picture: supabaseUser.user_metadata?.avatar_url,
+            // 使用会话中的用户信息
+            const userData: UserData = {
+              id: session.user.id,
+              email: session.user.email || '',
+              name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
+              picture: session.user.user_metadata?.avatar_url,
               credits: 0
             };
             
-            console.log('使用Auth用户信息:', userData);
             setUser(userData);
-            localStorage.setItem('user', JSON.stringify(userData));
             
             // 尝试创建用户记录
-            const { error: insertError } = await supabase
+            const { error: insertError } = await supabaseClient
               .from('users')
               .insert([{
-                id: supabaseUser.id,
-                email: supabaseUser.email,
+                id: session.user.id,
+                email: session.user.email,
                 name: userData.name,
                 avatar_url: userData.picture,
                 provider: 'google',
@@ -130,41 +95,27 @@ const Navbar: React.FC = () => {
             if (insertError) {
               console.error('创建用户记录失败:', insertError);
             }
-            
-            return;
-          }
-          
-          if (data) {
-            // 确保本地用户数据与Supabase保持同步
-            const updatedUserData = {
-              id: supabaseUser.id,
-              email: supabaseUser.email || data.email || '',
-              name: data.name || supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
-              picture: data.avatar_url || supabaseUser.user_metadata?.avatar_url,
+          } else if (data) {
+            // 使用数据库中的用户信息
+            setUser({
+              id: session.user.id,
+              email: session.user.email || data.email || '',
+              name: data.name || session.user.user_metadata?.name || 'User',
+              picture: data.avatar_url || session.user.user_metadata?.avatar_url,
               credits: data.credits || 0
-            };
-            
-            console.log('使用数据库用户信息:', updatedUserData);
-            setUser(updatedUserData);
-            localStorage.setItem('user', JSON.stringify(updatedUserData));
+            });
           }
-        } catch (error) {
-          console.error('获取用户资料异常:', error);
+        } catch (err) {
+          console.error('处理用户资料异常:', err);
         }
-      };
-      
-      fetchUserProfile();
-    } else {
-      // 检查localStorage是否有用户信息，但Supabase认证已失效
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        // 存在不一致状态，清除本地存储
-        console.log('检测到不一致状态：本地有用户数据但Supabase无认证');
-        localStorage.removeItem('user');
+      } else {
+        // 用户未登录，清除状态
         setUser(null);
       }
-    }
-  }, [supabaseUser, session]);
+    };
+    
+    updateUserState();
+  }, [session, supabaseClient]);
 
   // 显示用户积分
   const renderUserCredits = () => {
@@ -181,90 +132,35 @@ const Navbar: React.FC = () => {
   // 处理页面跳转并滚动到顶部
   const handleNavigate = (event: React.MouseEvent<HTMLAnchorElement>, path: string) => {
     event.preventDefault();
-    window.location.href = path;
+    navigate(path);
     window.scrollTo(0, 0);
     setIsToolsMenuOpen(false);
     setIsMenuOpen(false);
   };
 
-  // 使用useEffect来调试登录状态
-  useEffect(() => {
-    console.log('当前登录状态 - supabaseUser:', supabaseUser);
-    console.log('当前登录状态 - user:', user);
-    console.log('当前会话状态 - session:', session);
-  }, [supabaseUser, user, session]);
-
   // 处理登录
   const handleLogin = () => {
-    console.log('点击登录按钮');
-    setIsLoginModalOpen(true);
+    navigate('/login');
   };
 
   // 处理登出
   const handleLogout = async () => {
-    console.log('点击登出按钮');
     try {
-      const { signOut } = useSupabaseAuth();
-      await signOut();
+      const { error } = await supabaseClient.auth.signOut();
+      if (error) {
+        console.error('登出错误:', error);
+      } else {
+        setUser(null);
+        // 登出后跳转到首页
+        navigate('/');
+      }
     } catch (error) {
-      console.error('登出错误:', error);
+      console.error('登出异常:', error);
     }
   };
 
-  // 检查是否真正登录
-  const isLoggedIn = Boolean(supabaseUser && session);
-  console.log('登录状态检查 - isLoggedIn:', isLoggedIn);
-
-  // 在Navbar组件内添加定期的会话检查
-  useEffect(() => {
-    // 在Navbar组件内添加定期的会话检查
-    const checkSession = async () => {
-      try {
-        console.log('Navbar组件定期检查会话状态...');
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('获取会话错误:', error);
-          return;
-        }
-        
-        const currentSession = data.session;
-        console.log('当前会话状态:', currentSession ? '有效' : '无效', currentSession?.user?.id);
-        
-        // 如果会话有效但UI没有显示已登录，则更新UI
-        if (currentSession && !isLoggedIn) {
-          console.log('检测到会话有效但UI未更新，强制更新UI');
-          setUser({
-            id: currentSession.user.id,
-            email: currentSession.user.email || '',
-            name: currentSession.user.user_metadata?.name || currentSession.user.email?.split('@')[0] || 'User',
-            picture: currentSession.user.user_metadata?.avatar_url,
-            credits: 0
-          });
-          window.location.reload(); // 刷新页面确保所有组件更新状态
-        }
-        
-        // 如果会话无效但UI显示已登录，则清除状态
-        if (!currentSession && isLoggedIn) {
-          console.log('检测到会话无效但UI显示已登录，清除状态');
-          setUser(null);
-          localStorage.removeItem('user');
-          localStorage.removeItem('googleUserInfo');
-        }
-      } catch (err) {
-        console.error('检查会话错误:', err);
-      }
-    };
-    
-    // 组件挂载时立即检查一次
-    checkSession();
-    
-    // 每30秒检查一次会话状态
-    const sessionCheckInterval = setInterval(checkSession, 30000);
-    
-    // 清理定时器
-    return () => clearInterval(sessionCheckInterval);
-  }, [isLoggedIn]); // 依赖于isLoggedIn，当登录状态变化时重新设置检查
+  // 检查是否已登录
+  const isLoggedIn = !!session;
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-30 transition-all duration-300 ${isScrolled ? 'bg-[#0c111b] shadow-md py-2' : 'bg-transparent py-4'}`}>
@@ -293,9 +189,8 @@ const Navbar: React.FC = () => {
                 onMouseEnter={() => setIsToolsMenuOpen(true)}
                 onMouseLeave={() => setIsToolsMenuOpen(false)}
               >
-                <a 
-                  href="/create-video"
-                  onClick={(e) => handleNavigate(e, '/create-video')}
+                <Link 
+                  to="/create-video"
                   className={`flex items-center px-4 py-2 text-sm ${
                     isCreateVideoPage ? 'text-[#8A7CFF]' : 'text-white'
                   } hover:bg-[#252a37] transition-colors`}
@@ -304,7 +199,7 @@ const Navbar: React.FC = () => {
                     <Video size={14} className="text-[#8A7CFF]" />
                   </div>
                   <span>Video Generator</span>
-                </a>
+                </Link>
               </div>
             </div>
             
@@ -333,12 +228,15 @@ const Navbar: React.FC = () => {
             {isLoggedIn ? (
               <div className="flex items-center">
                 {renderUserCredits()}
-                <UserMenu userData={user || {
-                  id: supabaseUser?.id,
-                  email: supabaseUser?.email || 'unknown',
-                  name: supabaseUser?.user_metadata?.name || supabaseUser?.email?.split('@')[0] || 'User',
-                  picture: supabaseUser?.user_metadata?.avatar_url
-                }} />
+                <UserMenu 
+                  userData={user || {
+                    id: session?.user?.id,
+                    email: session?.user?.email || 'unknown',
+                    name: session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'User',
+                    picture: session?.user?.user_metadata?.avatar_url
+                  }} 
+                  onLogout={handleLogout}
+                />
               </div>
             ) : (
               <button
@@ -365,22 +263,22 @@ const Navbar: React.FC = () => {
       </nav>
 
       {/* Mobile menu */}
-        {isMenuOpen && (
+      {isMenuOpen && (
         <div className="md:hidden bg-[#1a1e27] shadow-lg">
           <div className="px-4 pt-2 pb-4 space-y-4">
-              <Link 
-                to="/" 
+            <Link 
+              to="/" 
               className={`block py-2 ${
                 isHomePage ? 'text-[#8A7CFF] font-medium' : 'text-white'
-                }`}
+              }`}
               onClick={() => setIsMenuOpen(false)}
-              >
-                Home
-              </Link>
+            >
+              Home
+            </Link>
             <div>
               <div 
                 onClick={() => {
-                  window.location.href = '/create-video';
+                  navigate('/create-video');
                   setIsMenuOpen(false);
                 }}
                 className={`block py-2 ${
@@ -390,8 +288,8 @@ const Navbar: React.FC = () => {
                 AI Tools
               </div>
             </div>
-              <Link 
-                to="/video-effects" 
+            <Link 
+              to="/video-effects" 
               className={`block py-2 ${
                 isVideoEffectsPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
               }`}
@@ -423,8 +321,8 @@ const Navbar: React.FC = () => {
                     )}
                   </div>
                   <div>
-                    <div className="text-white font-medium">{user?.name || supabaseUser?.email?.split('@')[0] || 'User'}</div>
-                    <div className="text-gray-400 text-sm">{user?.email || supabaseUser?.email || ''}</div>
+                    <div className="text-white font-medium">{user?.name || session?.user?.email?.split('@')[0] || 'User'}</div>
+                    <div className="text-gray-400 text-sm">{user?.email || session?.user?.email || ''}</div>
                   </div>
                 </div>
                 
@@ -457,7 +355,7 @@ const Navbar: React.FC = () => {
             ) : (
               <button
                 onClick={() => {
-                  setIsLoginModalOpen(true);
+                  navigate('/login');
                   setIsMenuOpen(false);
                 }}
                 className="block w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity mt-4"
@@ -465,15 +363,9 @@ const Navbar: React.FC = () => {
                 Login
               </button>
             )}
-            </div>
           </div>
-        )}
-
-      {/* 登录模态框 */}
-      <LoginModal
-        isOpen={isLoginModalOpen}
-        onRequestClose={() => setIsLoginModalOpen(false)}
-      />
+        </div>
+      )}
     </header>
   );
 };
