@@ -3,6 +3,7 @@ import { Menu, X, CreditCard, ChevronDown, Video, User } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
 import UserMenu from './UserMenu';
+import GoogleLoginModal from './GoogleLoginModal';
 
 interface UserData {
   id?: string;
@@ -19,6 +20,7 @@ const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   // 使用Supabase Auth Helpers获取会话
   const session = useSession();
@@ -127,7 +129,7 @@ const Navbar: React.FC = () => {
 
   // 处理登录
   const handleLogin = () => {
-    navigate('/login');
+    setIsLoginOpen(true);
   };
 
   // 处理登出
@@ -421,6 +423,7 @@ const Navbar: React.FC = () => {
           </div>
         </div>
       )}
+      <GoogleLoginModal isOpen={isLoginOpen} onRequestClose={() => setIsLoginOpen(false)} />
     </header>
   );
 };

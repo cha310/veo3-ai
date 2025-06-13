@@ -25,59 +25,18 @@ const LoginPage = () => {
         <div className="max-w-md mx-auto p-6 bg-[#1a1e27] rounded-lg shadow-lg">
           <h1 className="text-2xl font-bold mb-6 text-center">登录/注册</h1>
           
-          <Auth
-            supabaseClient={supabaseClient}
-            appearance={{
-              theme: ThemeSupa,
-              variables: {
-                default: {
-                  colors: {
-                    brand: '#8A7CFF',
-                    brandAccent: '#6C5CE7',
-                  },
-                },
-              },
-              className: {
-                container: 'auth-container',
-                button: 'auth-button',
-                input: 'auth-input',
-              },
+          <button
+            onClick={async () => {
+              const { error } = await supabaseClient.auth.signInWithOAuth({ provider: 'google' });
+              if (error) {
+                alert(error.message);
+              }
             }}
-            providers={['google']}
-            redirectTo={window.location.origin}
-            magicLink={true}
-            theme="dark"
-            localization={{
-              variables: {
-                sign_in: {
-                  email_label: '邮箱地址',
-                  password_label: '密码',
-                  button_label: '登录',
-                  link_text: '已有账号？登录',
-                  email_input_placeholder: '您的邮箱地址',
-                  password_input_placeholder: '您的密码',
-                },
-                sign_up: {
-                  email_label: '邮箱地址',
-                  password_label: '密码',
-                  button_label: '注册',
-                  link_text: '没有账号？注册',
-                  email_input_placeholder: '您的邮箱地址',
-                  password_input_placeholder: '创建一个密码',
-                },
-                magic_link: {
-                  button_label: '使用魔术链接登录',
-                  link_text: '通过邮箱魔术链接登录',
-                },
-                forgotten_password: {
-                  email_label: '邮箱地址',
-                  button_label: '发送重置指令',
-                  link_text: '忘记密码？',
-                  email_input_placeholder: '您的邮箱地址',
-                },
-              },
-            }}
-          />
+            className="w-full flex items-center justify-center space-x-2 bg-[#8A7CFF] hover:bg-[#6C5CE7] text-white py-3 rounded-lg transition-colors"
+          >
+            <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" className="w-5 h-5" />
+            <span>Sign in with Google</span>
+          </button>
 
           <div className="mt-6 text-center text-sm text-gray-400">
             <p>登录即表示您同意我们的</p>
