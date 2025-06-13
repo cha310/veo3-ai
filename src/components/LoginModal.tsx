@@ -6,6 +6,7 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { X } from 'lucide-react';
 
 // 不要在这里设置AppElement，因为在服务器渲染时会出错
+// Do not set AppElement here because it causes errors during server-side rendering
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -15,9 +16,10 @@ interface LoginModalProps {
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
   const [error, setError] = useState<string | null>(null);
   const supabaseClient = useSupabaseClient();
-
+  
   useEffect(() => {
     // 重置错误状态
+    // Reset error state
     if (isOpen) {
       setError(null);
     }
@@ -32,7 +34,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
       contentLabel="Login Modal"
     >
       <div className="bg-[#1a1e27] rounded-lg shadow-xl w-full max-w-md relative">
-        <button
+        <button 
           onClick={onRequestClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-white"
         >
@@ -40,14 +42,14 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
         </button>
         
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-white mb-6 text-center">登录/注册</h2>
-          
+          <h2 className="text-2xl font-bold text-white mb-6 text-center">Log In / Sign Up</h2>
+
           {error && (
             <div className="bg-red-500 bg-opacity-20 border border-red-500 text-red-300 p-3 rounded mb-4">
               {error}
-            </div>
-          )}
-          
+          </div>
+        )}
+
           <Auth
             supabaseClient={supabaseClient}
             appearance={{
@@ -68,46 +70,46 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose }) => {
             localization={{
               variables: {
                 sign_in: {
-                  email_label: '邮箱地址',
-                  password_label: '密码',
-                  button_label: '登录',
-                  link_text: '已有账号？登录',
-                  email_input_placeholder: '您的邮箱地址',
-                  password_input_placeholder: '您的密码',
+                  email_label: 'Email Address',
+                  password_label: 'Password',
+                  button_label: 'Log In',
+                  link_text: 'Already have an account? Log In',
+                  email_input_placeholder: 'Your email address',
+                  password_input_placeholder: 'Your password',
                 },
                 sign_up: {
-                  email_label: '邮箱地址',
-                  password_label: '密码',
-                  button_label: '注册',
-                  link_text: '没有账号？注册',
-                  email_input_placeholder: '您的邮箱地址',
-                  password_input_placeholder: '创建一个密码',
+                  email_label: 'Email Address',
+                  password_label: 'Password',
+                  button_label: 'Sign Up',
+                  link_text: "Don't have an account? Sign Up",
+                  email_input_placeholder: 'Your email address',
+                  password_input_placeholder: 'Create a password',
                 },
                 magic_link: {
-                  button_label: '使用魔术链接登录',
-                  link_text: '通过邮箱魔术链接登录',
+                  button_label: 'Sign in with Magic Link',
+                  link_text: 'Sign in via email magic link',
                 },
                 forgotten_password: {
-                  email_label: '邮箱地址',
-                  button_label: '发送重置指令',
-                  link_text: '忘记密码？',
-                  email_input_placeholder: '您的邮箱地址',
+                  email_label: 'Email Address',
+                  button_label: 'Send reset instructions',
+                  link_text: 'Forgot password?',
+                  email_input_placeholder: 'Your email address',
                 },
               },
             }}
           />
           
           <div className="mt-6 text-center text-sm text-gray-400">
-            <p>登录即表示您同意我们的</p>
+            <p>By logging in, you agree to our</p>
             <p>
               <a href="/terms-of-service" className="text-[#8A7CFF] hover:underline">
-                服务条款
+                Terms of Service
               </a>{' '}
-              和{' '}
+               and{' '}
               <a href="/privacy-policy" className="text-[#8A7CFF] hover:underline">
-                隐私政策
+                Privacy Policy
               </a>
-            </p>
+          </p>
           </div>
         </div>
       </div>

@@ -19,7 +19,7 @@ const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
-  
+
   // 使用Supabase Auth Helpers获取会话
   const session = useSession();
   const supabaseClient = useSupabaseClient();
@@ -137,7 +137,7 @@ const Navbar: React.FC = () => {
       if (error) {
         console.error('登出错误:', error);
       } else {
-        setUser(null);
+    setUser(null);
         // 登出后跳转到首页
         navigate('/');
       }
@@ -166,8 +166,8 @@ const Navbar: React.FC = () => {
               >
                 <span className="mr-1">AI Tools</span>
                 <ChevronDown size={16} />
-              </div>
-              
+        </div>
+
               <div 
                 ref={toolsMenuRef}
                 className={`absolute top-full left-0 mt-1 bg-[#1a1e27] rounded-lg shadow-lg py-2 w-48 z-10 transition-opacity duration-150 ${
@@ -176,7 +176,7 @@ const Navbar: React.FC = () => {
                 onMouseEnter={() => setIsToolsMenuOpen(true)}
                 onMouseLeave={() => setIsToolsMenuOpen(false)}
               >
-                <Link 
+          <Link 
                   to="/create-video"
                   className={`flex items-center px-4 py-2 text-sm ${
                     isCreateVideoPage ? 'text-[#8A7CFF]' : 'text-white'
@@ -186,20 +186,20 @@ const Navbar: React.FC = () => {
                     <Video size={14} className="text-[#8A7CFF]" />
                   </div>
                   <span>Video Generator</span>
-                </Link>
+          </Link>
               </div>
             </div>
             
-            <Link 
-              to="/video-effects" 
-              className={`transition-colors py-1.5 ${
+          <Link 
+            to="/video-effects" 
+            className={`transition-colors py-1.5 ${
                 isVideoEffectsPage 
-                  ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
-                  : 'text-white hover:text-[#8A7CFF]'
-              }`}
-            >
-              Video Effects
-            </Link>
+                ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
+                : 'text-white hover:text-[#8A7CFF]'
+            }`}
+          >
+            Video Effects
+          </Link>
             <Link 
               to="/pricing" 
               className={`transition-colors py-1.5 ${
@@ -210,8 +210,8 @@ const Navbar: React.FC = () => {
             >
               Pricing
             </Link>
-            
-            {/* 登录按钮或用户头像 */}
+          
+          {/* 登录按钮或用户头像 */}
             {isLoggedIn ? (
               <div className="flex items-center">
                 {renderUserCredits()}
@@ -226,14 +226,14 @@ const Navbar: React.FC = () => {
                 />
               </div>
             ) : (
-              <button
+              <button 
                 onClick={handleLogin}
                 className="bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
               >
                 Login
               </button>
-            )}
-          </div>
+              )}
+            </div>
         </div>
 
         {/* Mobile menu button */}
@@ -250,18 +250,18 @@ const Navbar: React.FC = () => {
       </nav>
 
       {/* Mobile menu */}
-      {isMenuOpen && (
+        {isMenuOpen && (
         <div className="md:hidden bg-[#1a1e27] shadow-lg">
           <div className="px-4 pt-2 pb-4 space-y-4">
-            <Link 
-              to="/" 
+              <Link 
+                to="/" 
               className={`block py-2 ${
                 isHomePage ? 'text-[#8A7CFF] font-medium' : 'text-white'
-              }`}
+                }`}
               onClick={() => setIsMenuOpen(false)}
-            >
-              Home
-            </Link>
+              >
+                Home
+              </Link>
             <div>
               <div 
                 onClick={() => {
@@ -275,8 +275,8 @@ const Navbar: React.FC = () => {
                 AI Tools
               </div>
             </div>
-            <Link 
-              to="/video-effects" 
+              <Link 
+                to="/video-effects" 
               className={`block py-2 ${
                 isVideoEffectsPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
               }`}
@@ -346,13 +346,13 @@ const Navbar: React.FC = () => {
                   setIsMenuOpen(false);
                 }}
                 className="block w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity mt-4"
-              >
+                >
                 Login
-              </button>
-            )}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </header>
   );
 };

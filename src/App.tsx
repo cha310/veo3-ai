@@ -84,22 +84,22 @@ function App() {
       <SessionContextProvider supabaseClient={supabase}>
         <BrowserRouter>
           <CanonicalHead baseUrl={SITE_URL} />
-          <div className="min-h-screen bg-[#121a22]">
-            <Routes>
-              <Route path="/" element={
-                <>
-                  <Navbar />
-                  <main>
-                    <Hero />
-                    <VideoGallery />
-                    <Features />
+        <div className="min-h-screen bg-[#121a22]">
+          <Routes>
+            <Route path="/" element={
+              <>
+                <Navbar />
+                <main>
+                  <Hero />
+                  <VideoGallery />
+                  <Features />
                     <HowToCreate />
-                    <FAQ />
-                  </main>
-                  <Footer />
-                </>
-              } />
-              <Route path="/video-effects" element={<VideoEffects />} />
+                  <FAQ />
+                </main>
+                <Footer />
+              </>
+            } />
+            <Route path="/video-effects" element={<VideoEffects />} />
               <Route path="/create-video" element={<TextToVideo />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
@@ -109,8 +109,8 @@ function App() {
               <Route path="/admin-logs" element={<AdminLogs />} />
               <Route path="/debug" element={<DebugPage />} />
               <Route path="/login" element={<LoginPage />} />
-            </Routes>
-          </div>
+          </Routes>
+        </div>
         </BrowserRouter>
       </SessionContextProvider>
     </GoogleOAuthProvider>
