@@ -150,46 +150,55 @@ const Navbar: React.FC = () => {
   const isLoggedIn = !!session;
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-30 transition-all duration-300 ${isScrolled ? 'bg-[#0c111b] shadow-md py-2' : 'bg-transparent py-4'}`}>
-      <nav className="max-w-7xl mx-auto px-4 flex justify-between items-center">
-        <div className="flex items-center">
-          <Link to="/" className="text-white text-xl font-bold mr-10">
-            VEO<span className="text-[#8A7CFF]">AI</span>
-          </Link>
-          
-          <div className="hidden md:flex items-center space-x-6">
-            <div className="relative group">
-              <div
-                className="flex items-center text-white hover:text-[#8A7CFF] cursor-pointer"
-                onMouseEnter={() => setIsToolsMenuOpen(true)}
-                onMouseLeave={() => setIsToolsMenuOpen(false)}
-              >
-                <span className="mr-1">AI Tools</span>
-                <ChevronDown size={16} />
-        </div>
-
-              <div 
-                ref={toolsMenuRef}
-                className={`absolute top-full left-0 mt-1 bg-[#1a1e27] rounded-lg shadow-lg py-2 w-48 z-10 transition-opacity duration-150 ${
-                  isToolsMenuOpen ? 'opacity-100' : 'opacity-0 invisible group-hover:opacity-100 group-hover:visible'
-                }`}
-                onMouseEnter={() => setIsToolsMenuOpen(true)}
-                onMouseLeave={() => setIsToolsMenuOpen(false)}
-              >
+    <header className={`fixed top-0 left-0 right-0 z-30 transition-all duration-300 ${isScrolled ? 'bg-[#0c111b] shadow-md py-3' : 'bg-transparent py-5'}`}>
+      <nav className="w-full px-4 md:px-8 flex items-center justify-between">
+        <Link to="/" className="mr-10 flex items-center">
+          <img src="/VEOAI2.svg" alt="VEO AI Logo" className="h-8 w-auto" />
+        </Link>
+        
+        <div className="hidden md:flex items-center space-x-6">
           <Link 
-                  to="/create-video"
-                  className={`flex items-center px-4 py-2 text-sm ${
-                    isCreateVideoPage ? 'text-[#8A7CFF]' : 'text-white'
-                  } hover:bg-[#252a37] transition-colors`}
-                >
-                  <div className="flex items-center justify-center w-7 h-7 rounded-md bg-[#2A3541] mr-2">
-                    <Video size={14} className="text-[#8A7CFF]" />
-                  </div>
-                  <span>Video Generator</span>
+            to="/" 
+            className={`transition-colors py-1.5 ${
+                isHomePage 
+                ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
+                : 'text-white hover:text-[#8A7CFF]'
+            }`}
+          >
+            Home
           </Link>
-              </div>
+          <div className="relative group">
+            <div
+              className="flex items-center text-white hover:text-[#8A7CFF] cursor-pointer"
+              onMouseEnter={() => setIsToolsMenuOpen(true)}
+              onMouseLeave={() => setIsToolsMenuOpen(false)}
+            >
+              <span className="mr-1">AI Tools</span>
+              <ChevronDown size={16} />
             </div>
-            
+
+            <div 
+              ref={toolsMenuRef}
+              className={`absolute top-full left-0 mt-1 bg-[#1a1e27] rounded-lg shadow-lg py-2 w-48 z-10 transition-opacity duration-150 ${
+                isToolsMenuOpen ? 'opacity-100' : 'opacity-0 invisible group-hover:opacity-100 group-hover:visible'
+              }`}
+              onMouseEnter={() => setIsToolsMenuOpen(true)}
+              onMouseLeave={() => setIsToolsMenuOpen(false)}
+            >
+              <Link 
+                to="/create-video"
+                className={`flex items-center px-4 py-2 text-sm ${
+                  isCreateVideoPage ? 'text-[#8A7CFF]' : 'text-white'
+                } hover:bg-[#252a37] transition-colors`}
+              >
+                <div className="flex items-center justify-center w-7 h-7 rounded-md bg-[#2A3541] mr-2">
+                  <Video size={14} className="text-[#8A7CFF]" />
+                </div>
+                <span>Video Generator</span>
+              </Link>
+            </div>
+          </div>
+          
           <Link 
             to="/video-effects" 
             className={`transition-colors py-1.5 ${
@@ -200,159 +209,218 @@ const Navbar: React.FC = () => {
           >
             Video Effects
           </Link>
-            <Link 
-              to="/pricing" 
-              className={`transition-colors py-1.5 ${
-                isPricingPage 
-                  ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
-                  : 'text-white hover:text-[#8A7CFF]'
-              }`}
-            >
-              Pricing
-            </Link>
-          
-          {/* 登录按钮或用户头像 */}
-            {isLoggedIn ? (
-              <div className="flex items-center">
-                {renderUserCredits()}
-                <UserMenu 
-                  userData={user || {
-                    id: session?.user?.id,
-                    email: session?.user?.email || 'unknown',
-                    name: session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'User',
-                    picture: session?.user?.user_metadata?.avatar_url
-                  }} 
-                  onLogout={handleLogout}
-                />
-              </div>
-            ) : (
-              <button 
-                onClick={handleLogin}
-                className="bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
-              >
-                Login
-              </button>
-              )}
-            </div>
-        </div>
-
-        {/* Mobile menu button */}
-        <div className="md:hidden flex items-center">
-          {user && renderUserCredits()}
-          
-          <button 
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="text-white p-2 focus:outline-none"
+          <Link 
+            to="/pricing" 
+            className={`transition-colors py-1.5 ${
+              isPricingPage 
+                ? 'bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent font-medium' 
+                : 'text-white hover:text-[#8A7CFF]'
+            }`}
           >
-            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+            Pricing
+          </Link>
+        
+          {/* 登录按钮或用户头像 */}
+          {isLoggedIn ? (
+            <div className="flex items-center">
+              {renderUserCredits()}
+              <UserMenu 
+                userData={user || {
+                  id: session?.user?.id,
+                  email: session?.user?.email || 'unknown',
+                  name: session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'User',
+                  picture: session?.user?.user_metadata?.avatar_url
+                }} 
+                onLogout={handleLogout}
+              />
+            </div>
+          ) : (
+            <button 
+              onClick={handleLogin}
+              className="bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
+            >
+              Login
+            </button>
+          )}
         </div>
       </nav>
 
-      {/* Mobile menu */}
-        {isMenuOpen && (
-        <div className="md:hidden bg-[#1a1e27] shadow-lg">
-          <div className="px-4 pt-2 pb-4 space-y-4">
-              <Link 
-                to="/" 
-              className={`block py-2 ${
-                isHomePage ? 'text-[#8A7CFF] font-medium' : 'text-white'
-                }`}
-              onClick={() => setIsMenuOpen(false)}
-              >
-                Home
-              </Link>
-            <div>
-              <div 
-                onClick={() => {
-                  navigate('/create-video');
-                  setIsMenuOpen(false);
-                }}
-                className={`block py-2 ${
-                  isCreateVideoPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
-                }`}
-              >
-                AI Tools
+      {/* Mobile menu button */}
+      <div className="md:hidden flex items-center">
+        {user && renderUserCredits()}
+        
+        <button 
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className="text-white p-2 focus:outline-none"
+        >
+          {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </div>
+
+      {/* Mobile menu button */}
+      <div className="md:hidden flex items-center ml-auto">
+        {/* 移动端登录/用户菜单 */}
+        {isLoggedIn ? (
+          <div className="border-t border-[#343a4d] pt-4 mt-4">
+            <div className="flex items-center mb-4">
+              <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                {user?.picture ? (
+                  <img src={user.picture} alt={user.name || 'User'} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-[#343a4d] flex items-center justify-center">
+                    <User size={20} className="text-white" />
+                  </div>
+                )}
+              </div>
+              <div>
+                <div className="text-white font-medium">{user?.name || session?.user?.email?.split('@')[0] || 'User'}</div>
+                <div className="text-gray-400 text-sm">{user?.email || session?.user?.email || ''}</div>
               </div>
             </div>
-              <Link 
-                to="/video-effects" 
-              className={`block py-2 ${
-                isVideoEffectsPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
-              }`}
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Video Effects
-            </Link>
+            
             <Link 
-              to="/pricing" 
-              className={`block py-2 ${
-                isPricingPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
-              }`}
+              to="/profile" 
+              className="block py-2 text-white"
               onClick={() => setIsMenuOpen(false)}
             >
-              Pricing
+              Profile
             </Link>
             
-            {/* 移动端登录/用户菜单 */}
-            {isLoggedIn ? (
-              <div className="border-t border-[#343a4d] pt-4 mt-4">
-                <div className="flex items-center mb-4">
-                  <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
-                    {user?.picture ? (
-                      <img src={user.picture} alt={user.name || 'User'} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-[#343a4d] flex items-center justify-center">
-                        <User size={20} className="text-white" />
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="text-white font-medium">{user?.name || session?.user?.email?.split('@')[0] || 'User'}</div>
-                    <div className="text-gray-400 text-sm">{user?.email || session?.user?.email || ''}</div>
-                  </div>
-                </div>
-                
-                <Link 
-                  to="/profile" 
-                  className="block py-2 text-white"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Profile
-                </Link>
-                
-                <Link 
-                  to="/settings" 
-                  className="block py-2 text-white"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Settings
-                </Link>
-                
-                <button 
-                  onClick={() => {
-                    handleLogout();
-                    setIsMenuOpen(false);
-                  }}
-                  className="block py-2 text-red-400 w-full text-left"
-                >
-                  Sign out
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => {
-                  navigate('/login');
-                  setIsMenuOpen(false);
-                }}
-                className="block w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity mt-4"
-                >
-                Login
-                </button>
-              )}
+            <Link 
+              to="/settings" 
+              className="block py-2 text-white"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Settings
+            </Link>
+            
+            <button 
+              onClick={() => {
+                handleLogout();
+                setIsMenuOpen(false);
+              }}
+              className="block py-2 text-red-400 w-full text-left"
+            >
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => {
+              navigate('/login');
+              setIsMenuOpen(false);
+            }}
+            className="block w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity mt-4"
+            >
+            Login
+            </button>
+          )}
+      </div>
+
+      {/* Mobile menu */}
+      {isMenuOpen && (
+      <div className="md:hidden bg-[#1a1e27] shadow-lg">
+        <div className="px-4 pt-2 pb-4 space-y-4">
+            <Link 
+              to="/" 
+            className={`block py-2 ${
+              isHomePage ? 'text-[#8A7CFF] font-medium' : 'text-white'
+              }`}
+            onClick={() => setIsMenuOpen(false)}
+            >
+              Home
+            </Link>
+          <div>
+            <div 
+              onClick={() => {
+                navigate('/create-video');
+                setIsMenuOpen(false);
+              }}
+              className={`block py-2 ${
+                isCreateVideoPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
+              }`}
+            >
+              AI Tools
             </div>
           </div>
-        )}
+            <Link 
+              to="/video-effects" 
+            className={`block py-2 ${
+              isVideoEffectsPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
+            }`}
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Video Effects
+          </Link>
+          <Link 
+            to="/pricing" 
+            className={`block py-2 ${
+              isPricingPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
+            }`}
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Pricing
+          </Link>
+          
+          {/* 移动端登录/用户菜单 */}
+          {isLoggedIn ? (
+            <div className="border-t border-[#343a4d] pt-4 mt-4">
+              <div className="flex items-center mb-4">
+                <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                  {user?.picture ? (
+                    <img src={user.picture} alt={user.name || 'User'} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-[#343a4d] flex items-center justify-center">
+                      <User size={20} className="text-white" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-white font-medium">{user?.name || session?.user?.email?.split('@')[0] || 'User'}</div>
+                  <div className="text-gray-400 text-sm">{user?.email || session?.user?.email || ''}</div>
+                </div>
+              </div>
+              
+              <Link 
+                to="/profile" 
+                className="block py-2 text-white"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Profile
+              </Link>
+              
+              <Link 
+                to="/settings" 
+                className="block py-2 text-white"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Settings
+              </Link>
+              
+              <button 
+                onClick={() => {
+                  handleLogout();
+                  setIsMenuOpen(false);
+                }}
+                className="block py-2 text-red-400 w-full text-left"
+              >
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                navigate('/login');
+                setIsMenuOpen(false);
+              }}
+              className="block w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity mt-4"
+              >
+              Login
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 };

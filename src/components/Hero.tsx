@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 
 const Hero: React.FC = () => {
   const [videoError, setVideoError] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // 检测视频是否可用
+  // 检测视频是否可用 & 强制静音
   useEffect(() => {
-    const video = document.querySelector('video');
+    const video = videoRef.current;
     if (video) {
+      video.muted = true;
+      video.volume = 0;
       video.addEventListener('error', () => {
         setVideoError(true);
       });
@@ -31,6 +34,7 @@ const Hero: React.FC = () => {
             loop
             muted
             playsInline
+            ref={videoRef}
             className="absolute inset-0 w-full h-full object-cover"
             onError={() => setVideoError(true)}
           >
