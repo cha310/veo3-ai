@@ -1,4 +1,5 @@
 import supabase from '../lib/supabase';
+import UAParser from 'ua-parser-js';
 
 /**
  * 记录用户登录信息（1分钟内只插入一次）
@@ -29,16 +30,71 @@ export const recordLoginActivity = async (
       return { success: true, skipped: true, message: '1分钟内已记录，无需重复插入' };
     }
 
-    // 获取IP地址（通过外部服务）
+    // 获取IP地址和地理信息
     let ipAddress = 'unknown';
+    let location = '';
+    let latitude = null;
+    let longitude = null;
+    let country_code = '';
+    let city_code = '';
+    let timezone = '';
+    let isp = '';
     try {
       const ipResponse = await fetch('https://api.ipify.org?format=json');
       if (ipResponse.ok) {
         const ipData = await ipResponse.json();
         ipAddress = ipData.ip;
+        // 获取地理位置
+        const locRes = await fetch(`https://ip-api.com/json/${ipAddress}?fields=city,region,regionName,country,countryCode,lat,lon,timezone,isp`);
+        if (locRes.ok) {
+          const locData = await locRes.json();
+          location = [locData.city, locData.regionName, locData.country].filter(Boolean).join(', ');
+          latitude = locData.lat || null;
+          longitude = locData.lon || null;
+          country_code = locData.countryCode || '';
+          city_code = locData.region || '';
+          timezone = locData.timezone || '';
+          isp = locData.isp || '';
+        }
       }
     } catch (error) {
-      console.error('获取IP地址失败:', error);
+      console.error('获取IP/地理位置失败:', error);
+    }
+
+    // 解析设备类型及相关信息
+    let device_type = 'unknown';
+    let os_name = '';
+    let browser_name = '';
+    let device_brand = '';
+    let device_model = '';
+    let is_mobile = false;
+    try {
+      const parser = new UAParser();
+      parser.setUA(userAgent);
+      const device = parser.getDevice();
+      const os = parser.getOS();
+      const browser = parser.getBrowser();
+      if (device.type) {
+        device_type = device.type; // mobile, tablet, etc.
+        is_mobile = device.type === 'mobile' || device.type === 'tablet';
+      } else {
+        device_type = 'desktop';
+        is_mobile = false;
+      }
+      os_name = os.name || '';
+      browser_name = browser.name || '';
+      device_brand = device.vendor || '';
+      device_model = device.model || '';
+    } catch (error) {
+      console.error('解析设备类型失败:', error);
+    }
+
+    // 获取本地时间字符串
+    let local_time = '';
+    try {
+      local_time = new Date().toLocaleString();
+    } catch (error) {
+      local_time = '';
     }
 
     // 记录登录信息到数据库
@@ -50,7 +106,21 @@ export const recordLoginActivity = async (
           login_time: new Date().toISOString(),
           ip_address: ipAddress,
           user_agent: userAgent,
-          provider: provider
+          provider: provider,
+          device_type,
+          location,
+          local_time,
+          latitude,
+          longitude,
+          country_code,
+          city_code,
+          timezone,
+          isp,
+          os_name,
+          browser_name,
+          device_brand,
+          device_model,
+          is_mobile
         }
       ]);
 
