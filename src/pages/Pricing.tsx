@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 import { CheckCircle } from 'lucide-react';
 import { addCredits, getUserCredits } from '../services/creditService';
 
@@ -287,6 +288,7 @@ const Pricing: React.FC = () => {
           })()}
         </section>
       </main>
+      <Footer />
     </div>
   );
 };
