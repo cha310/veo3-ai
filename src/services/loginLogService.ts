@@ -30,62 +30,27 @@ export const recordLoginActivity = async (
       return { success: true, skipped: true, message: '1分钟内已记录，无需重复插入' };
     }
 
-    // 获取IP地址和地理信息
+    // 获取IP地址
     let ipAddress = 'unknown';
-    let location = '';
-    let latitude = null;
-    let longitude = null;
-    let country_code = '';
-    let city_code = '';
-    let timezone = '';
-    let isp = '';
     
-    // 尝试获取IP地址 - 使用多个备选服务，但不再尝试获取地理位置
+    // 尝试获取IP地址 - 简单方法
     try {
-      // 使用ipify服务获取IP
-      const controller1 = new AbortController();
-      const timeoutId1 = setTimeout(() => controller1.abort(), 3000);
+      // 尝试使用ipify服务获取IP
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
       try {
         const ipResponse = await fetch('https://api.ipify.org?format=json', { 
-          signal: controller1.signal 
+          signal: controller.signal 
         });
         if (ipResponse.ok) {
-          const ipData = await ipResponse.json();
-          ipAddress = ipData.ip;
+          const data = await ipResponse.json();
+          ipAddress = data.ip;
         }
       } catch (error) {
-        console.error('ipify服务获取IP失败，尝试备用服务:', error);
+        console.error('获取IP失败，继续主流程:', error);
       } finally {
-        clearTimeout(timeoutId1);
+        clearTimeout(timeoutId);
       }
-      
-      // 如果ipify失败，尝试使用ipinfo
-      if (ipAddress === 'unknown') {
-        const controller2 = new AbortController();
-        const timeoutId2 = setTimeout(() => controller2.abort(), 3000);
-        try {
-          const ipResponse = await fetch('https://ipinfo.io/json', { 
-            signal: controller2.signal 
-          });
-          if (ipResponse.ok) {
-            const ipData = await ipResponse.json();
-            ipAddress = ipData.ip;
-            // ipinfo同时提供了一些地理信息，可以直接使用
-            if (ipData.city && ipData.region && ipData.country) {
-              location = `${ipData.city}, ${ipData.region}, ${ipData.country}`;
-              country_code = ipData.country;
-              city_code = ipData.region;
-              timezone = ipData.timezone || '';
-            }
-          }
-        } catch (error) {
-          console.error('ipinfo服务获取IP失败:', error);
-        } finally {
-          clearTimeout(timeoutId2);
-        }
-      }
-      
-      // 不再使用IP-API服务，避免403错误
     } catch (error) {
       console.error('获取IP地址失败，继续主流程:', error);
     }
@@ -137,14 +102,7 @@ export const recordLoginActivity = async (
           user_agent: userAgent,
           provider: provider,
           device_type,
-          location,
           local_time,
-          latitude,
-          longitude,
-          country_code,
-          city_code,
-          timezone,
-          isp,
           os_name,
           browser_name,
           device_brand,
