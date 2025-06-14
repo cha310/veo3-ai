@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, LogOut, Settings } from 'lucide-react';
+import { User, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export interface UserData {
@@ -68,25 +68,6 @@ const UserMenu: React.FC<UserMenuProps> = ({ userData, onLogout }) => {
             <div className="text-white font-medium truncate">{userData.name || userData.email.split('@')[0]}</div>
             <div className="text-gray-400 text-xs truncate">{userData.email}</div>
           </div>
-          
-          <Link 
-            to="/profile" 
-            className="block px-4 py-2 text-white hover:bg-[#252a37] transition-colors"
-            onClick={() => setIsOpen(false)}
-          >
-            Profile
-          </Link>
-          
-          <Link 
-            to="/settings" 
-            className="block px-4 py-2 text-white hover:bg-[#252a37] transition-colors"
-            onClick={() => setIsOpen(false)}
-          >
-            <div className="flex items-center">
-              <Settings size={14} className="mr-2" />
-              <span>Settings</span>
-            </div>
-          </Link>
           
           <button 
             onClick={handleLogout}

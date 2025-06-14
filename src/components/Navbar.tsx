@@ -317,22 +317,6 @@ const Navbar: React.FC = () => {
                 </div>
               </div>
               
-              <Link 
-                to="/profile" 
-                className="block py-2 text-white"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Profile
-              </Link>
-              
-              <Link 
-                to="/settings" 
-                className="block py-2 text-white"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Settings
-              </Link>
-              
               <button 
                 onClick={() => {
                   handleLogout();
