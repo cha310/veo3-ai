@@ -22,7 +22,7 @@ const LoginPage = () => {
 
   return (
     <>
-      <Navbar />
+      <div className="hidden md:block"><Navbar /></div>
       <div className="min-h-screen bg-gradient-to-b from-[#1b1e26] via-[#12151c] to-[#0b0d12] flex items-center justify-center py-16 px-4 text-white relative overflow-hidden">
         {/* 背景柔光圆 */}
         <div className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[480px] h-[480px] bg-[#6C5CE7]/20 blur-3xl rounded-full"></div>
