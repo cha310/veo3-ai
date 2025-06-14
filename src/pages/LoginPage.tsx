@@ -21,33 +21,65 @@ const LoginPage = () => {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-[#121a22] text-white pt-20 pb-10">
-        <div className="max-w-md mx-auto p-6 bg-[#1a1e27] rounded-lg shadow-lg">
-          <h1 className="text-2xl font-bold mb-6 text-center">登录/注册</h1>
-          
-          <button
-            onClick={async () => {
-              const { error } = await supabaseClient.auth.signInWithOAuth({ provider: 'google' });
-              if (error) {
-                alert(error.message);
-              }
-            }}
-            className="w-full flex items-center justify-center space-x-2 bg-[#8A7CFF] hover:bg-[#6C5CE7] text-white py-3 rounded-lg transition-colors"
-          >
-            <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" className="w-5 h-5" />
-            <span>Sign in with Google</span>
-          </button>
+      <div className="min-h-screen bg-[#000] flex items-center justify-center py-16 px-4 text-white">
+        <div className="w-full max-w-md bg-[#1f1f25] rounded-xl overflow-hidden shadow-2xl">
+          {/* 顶部展示图 */}
+          <div className="h-56 w-full overflow-hidden">
+            <video autoPlay loop muted playsInline className="w-full h-full object-cover">
+              <source src="/videos/login_background.mp4" type="video/mp4" />
+            </video>
+          </div>
 
-          <div className="mt-6 text-center text-sm text-gray-400">
-            <p>登录即表示您同意我们的</p>
-            <p>
-              <a href="/terms-of-service" className="text-[#8A7CFF] hover:underline">
-                服务条款
-              </a>{' '}
-              和{' '}
-              <a href="/privacy-policy" className="text-[#8A7CFF] hover:underline">
-                隐私政策
-              </a>
+          {/* 内容区域 */}
+          <div className="p-8 text-center">
+            {/* 品牌 Logo */}
+            <div className="flex justify-center mb-8">
+              <img src="/VEOAI2.svg" alt="VEOAI" className="h-10" />
+            </div>
+
+            {/* Google button with visible gradient border */}
+            <div className="p-[1px] rounded-xl bg-gradient-to-r from-[#FBBC05] via-[#EA4335] via-[#34A853] via-[#4285F4] to-[#A142F4]">
+              <button
+                onClick={async () => {
+                  const { data, error } = await supabaseClient.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: { skipBrowserRedirect: true },
+                  });
+                  if (error) return alert(error.message);
+                  if (data?.url) {
+                    const w = 480,
+                      h = 600,
+                      left = window.screenX + (window.innerWidth - w) / 2,
+                      top = window.screenY + (window.innerHeight - h) / 2;
+                    const popup = window.open(
+                      data.url,
+                      'oauth-google',
+                      `width=${w},height=${h},left=${left},top=${top},resizable=no,toolbar=no,menubar=no`
+                    );
+
+                    const { data: listener } = supabaseClient.auth.onAuthStateChange((event) => {
+                      if (event === 'SIGNED_IN') {
+                        popup?.close();
+                        listener.subscription.unsubscribe();
+                        window.location.href = '/';
+                      }
+                    });
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-4 px-8 py-4 bg-[#1f1f25] rounded-[inherit] text-white font-medium hover:bg-[#27272f] transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
+                  <span className="text-lg">Continue with Google</span>
+                </div>
+                <span className="text-2xl ml-1">→</span>
+              </button>
+            </div>
+
+            <p className="mt-10 text-xs text-gray-500">
+              By signing in, you agree to our{' '}
+              <a href="/terms-of-service" className="text-[#8A7CFF] hover:underline">Terms of Service</a> and{' '}
+              <a href="/privacy-policy" className="text-[#8A7CFF] hover:underline">Privacy Policy</a>.
             </p>
           </div>
         </div>

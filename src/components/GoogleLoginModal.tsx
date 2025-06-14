@@ -61,17 +61,19 @@ const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({ isOpen, onRequestCl
         <h2 className="text-3xl font-bold mb-2">Sign in to VEO AI</h2>
         <p className="text-gray-400 mb-8 text-sm">Log in quickly using your Google account.</p>
 
-        <button
-          onClick={handleGoogleLogin}
-          className="w-full flex items-center justify-center gap-3 border border-transparent bg-white/10 hover:bg-white/20 rounded-lg py-3 transition-colors"
-        >
-          <img
-            src="https://developers.google.com/identity/images/g-logo.png"
-            alt="Google"
-            className="w-5 h-5"
-          />
-          <span className="font-medium">Continue with Google</span>
-        </button>
+        <div className="p-[2px] rounded-xl bg-gradient-to-r from-lime-300 via-sky-400 to-rose-400">
+          <button
+            onClick={handleGoogleLogin}
+            className="flex w-full items-center justify-between px-8 py-4 rounded-[inherit] bg-[#1f1f25] text-white"
+          >
+            <img
+              src="/icons/google.svg"
+              alt="Google"
+              className="w-6 h-6"
+            />
+            <span className="font-medium">Continue with Google</span>
+          </button>
+        </div>
 
         <p className="mt-10 text-xs text-gray-500">
           By signing in, you agree to our{' '}
