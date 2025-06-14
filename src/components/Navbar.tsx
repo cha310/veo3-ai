@@ -78,7 +78,7 @@ const Navbar: React.FC = () => {
             // 尝试创建用户记录
             const { error: insertError } = await supabaseClient
               .from('users')
-              .insert([{
+              .upsert([{
                 id: session.user.id,
                 email: session.user.email,
                 name: userData.name,
@@ -87,10 +87,10 @@ const Navbar: React.FC = () => {
                 credits: 0,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
-              }]);
+              }], { onConflict: 'id' });
             
             if (insertError) {
-              console.error('创建用户记录失败:', insertError);
+              console.error('更新用户记录失败:', insertError);
             }
           } else if (data) {
             // 使用数据库中的用户信息

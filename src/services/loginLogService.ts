@@ -45,20 +45,26 @@ export const recordLoginActivity = async (
         const ipData = await ipResponse.json();
         ipAddress = ipData.ip;
         // 获取地理位置
-        const locRes = await fetch(`https://ip-api.com/json/${ipAddress}?fields=city,region,regionName,country,countryCode,lat,lon,timezone,isp`);
-        if (locRes.ok) {
-          const locData = await locRes.json();
-          location = [locData.city, locData.regionName, locData.country].filter(Boolean).join(', ');
-          latitude = locData.lat || null;
-          longitude = locData.lon || null;
-          country_code = locData.countryCode || '';
-          city_code = locData.region || '';
-          timezone = locData.timezone || '';
-          isp = locData.isp || '';
+        try {
+          const locRes = await fetch(`https://ip-api.com/json/${ipAddress}?fields=city,region,regionName,country,countryCode,lat,lon,timezone,isp`);
+          if (locRes.ok) {
+            const locData = await locRes.json();
+            location = [locData.city, locData.regionName, locData.country].filter(Boolean).join(', ');
+            latitude = locData.lat || null;
+            longitude = locData.lon || null;
+            country_code = locData.countryCode || '';
+            city_code = locData.region || '';
+            timezone = locData.timezone || '';
+            isp = locData.isp || '';
+          } else {
+            console.error('IP-API返回错误状态码:', locRes.status);
+          }
+        } catch (geoError) {
+          console.error('地理位置获取失败，继续主流程:', geoError);
         }
       }
     } catch (error) {
-      console.error('获取IP/地理位置失败:', error);
+      console.error('获取IP/地理位置失败，继续主流程:', error);
     }
 
     // 解析设备类型及相关信息
