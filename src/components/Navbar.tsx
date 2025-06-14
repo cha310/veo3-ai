@@ -257,10 +257,10 @@ const Navbar: React.FC = () => {
 
       {/* Mobile menu */}
       {isMenuOpen && (
-      <div className="fixed inset-0 z-20 md:hidden bg-[#0c111b]/95 backdrop-blur-sm flex flex-col pt-24 px-6 space-y-8">
+      <div className="fixed inset-0 z-50 md:hidden bg-[#0c111b]/90 backdrop-blur-sm flex flex-col items-center justify-center px-6 space-y-10 text-center">
         <Link 
           to="/" 
-          className={`text-2xl ${isHomePage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
+          className={`text-3xl ${isHomePage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
           onClick={() => setIsMenuOpen(false)}
         >
           Home
@@ -271,21 +271,21 @@ const Navbar: React.FC = () => {
               navigate('/create-video');
               setIsMenuOpen(false);
             }}
-            className={`${isCreateVideoPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'} text-2xl`}
+            className={`${isCreateVideoPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'} text-3xl`}
           >
             AI Tools
           </div>
         </div>
         <Link 
           to="/video-effects" 
-          className={`text-2xl ${isVideoEffectsPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
+          className={`text-3xl ${isVideoEffectsPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
           onClick={() => setIsMenuOpen(false)}
         >
           Video Effects
         </Link>
         <Link 
           to="/pricing" 
-          className={`text-2xl ${isPricingPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
+          className={`text-3xl ${isPricingPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
           onClick={() => setIsMenuOpen(false)}
         >
           Pricing
@@ -293,7 +293,7 @@ const Navbar: React.FC = () => {
         
         {/* 移动端登录/用户菜单 */}
         {isLoggedIn ? (
-          <div className="border-t border-[#343a4d] pt-6 mt-6 space-y-4">
+          <div className="border-t border-[#343a4d] pt-6 mt-6 space-y-4 w-full">
             <div className="flex items-center mb-4">
               <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
                 {user?.picture ? (
@@ -331,7 +331,7 @@ const Navbar: React.FC = () => {
                 handleLogout();
                 setIsMenuOpen(false);
               }}
-              className="block py-2 text-red-400 w-full text-left"
+              className="w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
             >
               Sign out
             </button>
@@ -342,7 +342,7 @@ const Navbar: React.FC = () => {
               navigate('/login');
               setIsMenuOpen(false);
             }}
-            className="block w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity mt-4"
+            className="w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
             >
             Login
             </button>
