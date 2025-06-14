@@ -5,6 +5,7 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { useSupabaseClient, useSession } from '@supabase/auth-helpers-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { recordLoginActivity } from '../services/loginLogService';
 
 const LoginPage = () => {
   const supabaseClient = useSupabaseClient();
@@ -65,6 +66,25 @@ const LoginPage = () => {
                       if (event === 'SIGNED_IN') {
                         popup?.close();
                         listener.subscription.unsubscribe();
+                        
+                        // 获取当前登录用户信息并记录登录
+                        supabaseClient.auth.getUser().then(({ data: { user } }) => {
+                          if (user) {
+                            const provider = user.app_metadata?.provider || 'google';
+                            recordLoginActivity(user.id, provider)
+                              .then(result => {
+                                if (result.success) {
+                                  console.log('登录页面: 登录记录已保存');
+                                } else {
+                                  console.error('登录页面: 保存登录记录失败:', result.error);
+                                }
+                              })
+                              .catch(error => {
+                                console.error('登录页面: 记录登录信息异常:', error);
+                              });
+                          }
+                        });
+                        
                         window.location.href = '/';
                       }
                     });

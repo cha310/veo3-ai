@@ -21,6 +21,7 @@ import CanonicalHead from './components/CanonicalHead';
 import DebugPage from './pages/debug';
 import LoginPage from './pages/LoginPage';
 import supabase from './lib/supabase.ts';
+import { recordLoginActivity } from './services/loginLogService';
 
 // 从环境变量获取Google OAuth客户端ID
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1049691614917-7ncrqa4qmmg4oiamn8i1dfbrvphicoju.apps.googleusercontent.com';
@@ -39,6 +40,22 @@ function App() {
         // 记录基本信息到控制台，帮助调试
         console.log('当前域名:', window.location.origin);
         console.log('预期站点URL:', SITE_URL);
+        
+        // 记录用户登录信息
+        if (session.user) {
+          const provider = session.user.app_metadata?.provider || 'unknown';
+          recordLoginActivity(session.user.id, provider)
+            .then(result => {
+              if (result.success) {
+                console.log('登录记录已保存');
+              } else {
+                console.error('保存登录记录失败:', result.error);
+              }
+            })
+            .catch(error => {
+              console.error('记录登录信息异常:', error);
+            });
+        }
         
         // 如果URL包含访问令牌，清理URL
         if (window.location.hash && window.location.hash.includes('access_token')) {
