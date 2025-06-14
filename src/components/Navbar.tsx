@@ -157,6 +157,15 @@ const Navbar: React.FC = () => {
           <img src="/VEOAI2.svg" alt="VEO AI Logo" className="h-8 w-auto" />
         </Link>
         
+        {/* Mobile hamburger */}
+        <button
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className="text-white p-2 focus:outline-none md:hidden"
+        >
+          {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+
+        {/* Desktop menu */}
         <div className="hidden md:flex items-center space-x-6">
           <Link 
             to="/" 
@@ -245,16 +254,6 @@ const Navbar: React.FC = () => {
           )}
         </div>
       </nav>
-
-      {/* Mobile hamburger inside nav右侧 */}
-      <div className="md:hidden ml-auto flex items-center">
-        <button
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="text-white p-2 focus:outline-none"
-        >
-          {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </div>
 
       {/* Mobile menu */}
       {isMenuOpen && (
