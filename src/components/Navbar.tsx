@@ -246,76 +246,14 @@ const Navbar: React.FC = () => {
         </div>
       </nav>
 
-      {/* Mobile menu button */}
-      <div className="md:hidden flex items-center">
-        {user && renderUserCredits()}
-        
-        <button 
+      {/* Mobile hamburger inside nav右侧 */}
+      <div className="md:hidden ml-auto flex items-center">
+        <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
           className="text-white p-2 focus:outline-none"
         >
           {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
-      </div>
-
-      {/* Mobile menu button */}
-      <div className="md:hidden flex items-center ml-auto">
-        {/* 移动端登录/用户菜单 */}
-        {isLoggedIn ? (
-          <div className="border-t border-[#343a4d] pt-4 mt-4">
-            <div className="flex items-center mb-4">
-              <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
-                {user?.picture ? (
-                  <img src={user.picture} alt={user.name || 'User'} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-[#343a4d] flex items-center justify-center">
-                    <User size={20} className="text-white" />
-                  </div>
-                )}
-              </div>
-              <div>
-                <div className="text-white font-medium">{user?.name || session?.user?.email?.split('@')[0] || 'User'}</div>
-                <div className="text-gray-400 text-sm">{user?.email || session?.user?.email || ''}</div>
-              </div>
-            </div>
-            
-            <Link 
-              to="/profile" 
-              className="block py-2 text-white"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Profile
-            </Link>
-            
-            <Link 
-              to="/settings" 
-              className="block py-2 text-white"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Settings
-            </Link>
-            
-            <button 
-              onClick={() => {
-                handleLogout();
-                setIsMenuOpen(false);
-              }}
-              className="block py-2 text-red-400 w-full text-left"
-            >
-              Sign out
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => {
-              navigate('/login');
-              setIsMenuOpen(false);
-            }}
-            className="block w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity mt-4"
-            >
-            Login
-            </button>
-          )}
       </div>
 
       {/* Mobile menu */}
