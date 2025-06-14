@@ -93,22 +93,18 @@ const availableModels: AIModel[] = [
 // 渲染模型图标的辅助函数
 const renderModelIcon = (modelName: string, size: 'sm' | 'md' | 'lg' = 'md') => {
   const sizeClasses = {
-    sm: 'w-5 h-5 text-xs',
-    md: 'w-6 h-6 text-xs',
-    lg: 'w-10 h-10 text-sm'
+    sm: 'w-5 h-5',
+    md: 'w-6 h-6',
+    lg: 'w-10 h-10'
   };
   
   if (modelName.includes('Google')) {
     return (
-      <div className={`flex items-center justify-center rounded-full bg-blue-500 ${sizeClasses[size]}`}>
-        <span className="text-white font-bold">G</span>
-      </div>
+      <img src="/icons/google.svg" alt="Google" className={sizeClasses[size]} />
     );
   } else if (modelName.includes('Kling')) {
     return (
-      <div className={`flex items-center justify-center rounded-full bg-purple-500 ${sizeClasses[size]}`}>
-        <span className="text-white font-bold">K</span>
-      </div>
+      <img src="/icons/kling.svg" alt="Kling" className={sizeClasses[size]} />
     );
   } else {
     const currentModel = availableModels.find(m => m.name === modelName);

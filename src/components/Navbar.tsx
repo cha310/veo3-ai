@@ -153,17 +153,19 @@ const Navbar: React.FC = () => {
   return (
     <header className={`fixed top-0 left-0 right-0 z-30 transition-all duration-300 ${isScrolled ? 'bg-[#0c111b] shadow-md py-3' : 'bg-transparent py-5'}`}>
       <nav className="w-full px-4 md:px-8 flex items-center justify-between">
-        <Link to="/" className="mr-10 flex items-center">
-          <img src="/VEOAI2.svg" alt="VEO AI Logo" className="h-8 w-auto" />
-        </Link>
-        
-        {/* Mobile hamburger */}
-        <button
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="text-white p-2 focus:outline-none md:hidden"
-        >
-          {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+        <div className="flex items-center">
+          <Link to="/" className="flex items-center">
+            <img src="/VEOAI2.svg" alt="VEO AI Logo" className="h-8 w-auto" />
+          </Link>
+          
+          {/* 移动汉堡菜单按钮移到Logo右侧 */}
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="text-white p-2 ml-4 focus:outline-none md:hidden"
+          >
+            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
 
         {/* Desktop menu */}
         <div className="hidden md:flex items-center space-x-6">
@@ -257,98 +259,100 @@ const Navbar: React.FC = () => {
 
       {/* Mobile menu */}
       {isMenuOpen && (
-      <div className="fixed inset-0 z-50 md:hidden bg-[#0c111b]/90 backdrop-blur-sm flex flex-col items-center justify-center px-6 space-y-10 text-center">
-        <Link 
-          to="/" 
-          className={`text-3xl ${isHomePage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
-          onClick={() => setIsMenuOpen(false)}
-        >
-          Home
-        </Link>
-        <div>
-          <div 
-            onClick={() => {
-              navigate('/create-video');
-              setIsMenuOpen(false);
-            }}
-            className={`${isCreateVideoPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'} text-3xl`}
+        <div className="fixed inset-0 z-50 md:hidden bg-[#0c111b]/90 backdrop-blur-sm flex flex-col items-center justify-center px-6 space-y-10 text-center">
+          <Link 
+            to="/" 
+            className={`text-3xl ${isHomePage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
+            onClick={() => setIsMenuOpen(false)}
           >
-            AI Tools
-          </div>
-        </div>
-        <Link 
-          to="/video-effects" 
-          className={`text-3xl ${isVideoEffectsPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
-          onClick={() => setIsMenuOpen(false)}
-        >
-          Video Effects
-        </Link>
-        <Link 
-          to="/pricing" 
-          className={`text-3xl ${isPricingPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
-          onClick={() => setIsMenuOpen(false)}
-        >
-          Pricing
-        </Link>
-        
-        {/* 移动端登录/用户菜单 */}
-        {isLoggedIn ? (
-          <div className="border-t border-[#343a4d] pt-6 mt-6 space-y-4 w-full">
-            <div className="flex items-center mb-4">
-              <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
-                {user?.picture ? (
-                  <img src={user.picture} alt={user.name || 'User'} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-[#343a4d] flex items-center justify-center">
-                    <User size={20} className="text-white" />
-                  </div>
-                )}
-              </div>
-              <div>
-                <div className="text-white font-medium">{user?.name || session?.user?.email?.split('@')[0] || 'User'}</div>
-                <div className="text-gray-400 text-sm">{user?.email || session?.user?.email || ''}</div>
-              </div>
-            </div>
-            
-            <Link 
-              to="/profile" 
-              className="block py-2 text-white"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Profile
-            </Link>
-            
-            <Link 
-              to="/settings" 
-              className="block py-2 text-white"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Settings
-            </Link>
-            
-            <button 
+            Home
+          </Link>
+          <div>
+            <div 
               onClick={() => {
-                handleLogout();
+                navigate('/create-video');
+                setIsMenuOpen(false);
+              }}
+              className={`${isCreateVideoPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'} text-3xl`}
+            >
+              AI Tools
+            </div>
+          </div>
+          <Link 
+            to="/video-effects" 
+            className={`text-3xl ${isVideoEffectsPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Video Effects
+          </Link>
+          <Link 
+            to="/pricing" 
+            className={`text-3xl ${isPricingPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Pricing
+          </Link>
+          
+          {/* 移动端登录/用户菜单 - 只在用户登录时显示相关信息，不再显示重复的登录按钮 */}
+          {isLoggedIn && (
+            <div className="border-t border-[#343a4d] pt-6 mt-6 space-y-4 w-full">
+              <div className="flex items-center mb-4">
+                <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                  {user?.picture ? (
+                    <img src={user.picture} alt={user.name || 'User'} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-[#343a4d] flex items-center justify-center">
+                      <User size={20} className="text-white" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-white font-medium">{user?.name || session?.user?.email?.split('@')[0] || 'User'}</div>
+                  <div className="text-gray-400 text-sm">{user?.email || session?.user?.email || ''}</div>
+                </div>
+              </div>
+              
+              <Link 
+                to="/profile" 
+                className="block py-2 text-white"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Profile
+              </Link>
+              
+              <Link 
+                to="/settings" 
+                className="block py-2 text-white"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Settings
+              </Link>
+              
+              <button 
+                onClick={() => {
+                  handleLogout();
+                  setIsMenuOpen(false);
+                }}
+                className="w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+          
+          {/* 移动端登录按钮 - 仅在用户未登录时显示 */}
+          {!isLoggedIn && (
+            <button
+              onClick={() => {
+                navigate('/login');
                 setIsMenuOpen(false);
               }}
               className="w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
             >
-              Sign out
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => {
-              navigate('/login');
-              setIsMenuOpen(false);
-            }}
-            className="w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
-            >
-            Login
+              Login
             </button>
           )}
         </div>
-      </div>
       )}
     </header>
   );
