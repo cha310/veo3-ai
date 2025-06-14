@@ -40,62 +40,54 @@ export const recordLoginActivity = async (
     let timezone = '';
     let isp = '';
     
-    // 尝试获取IP地址 - 使用多个备选服务
+    // 尝试获取IP地址 - 使用多个备选服务，但不再尝试获取地理位置
     try {
-      // 首选服务
+      // 使用ipify服务获取IP
       const controller1 = new AbortController();
       const timeoutId1 = setTimeout(() => controller1.abort(), 3000);
-      let ipResponse = await fetch('https://api.ipify.org?format=json', { signal: controller1.signal });
-      clearTimeout(timeoutId1);
-      
-      if (!ipResponse.ok) {
-        // 备选服务1
-        const controller2 = new AbortController();
-        const timeoutId2 = setTimeout(() => controller2.abort(), 3000);
-        ipResponse = await fetch('https://ipinfo.io/json', { signal: controller2.signal });
-        clearTimeout(timeoutId2);
-        
+      try {
+        const ipResponse = await fetch('https://api.ipify.org?format=json', { 
+          signal: controller1.signal 
+        });
         if (ipResponse.ok) {
           const ipData = await ipResponse.json();
           ipAddress = ipData.ip;
         }
-      } else {
-        const ipData = await ipResponse.json();
-        ipAddress = ipData.ip;
+      } catch (error) {
+        console.error('ipify服务获取IP失败，尝试备用服务:', error);
+      } finally {
+        clearTimeout(timeoutId1);
       }
       
-      // 只有在成功获取IP后才尝试获取地理位置
-      if (ipAddress !== 'unknown') {
+      // 如果ipify失败，尝试使用ipinfo
+      if (ipAddress === 'unknown') {
+        const controller2 = new AbortController();
+        const timeoutId2 = setTimeout(() => controller2.abort(), 3000);
         try {
-          // 使用IP-API但添加超时和重试限制
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 2000); // 2秒超时
-          
-          const locRes = await fetch(
-            `https://ip-api.com/json/${ipAddress}?fields=city,region,regionName,country,countryCode,lat,lon,timezone,isp`, 
-            { signal: controller.signal }
-          );
-          clearTimeout(timeoutId);
-          
-          if (locRes.ok) {
-            const locData = await locRes.json();
-            location = [locData.city, locData.regionName, locData.country].filter(Boolean).join(', ');
-            latitude = locData.lat || null;
-            longitude = locData.lon || null;
-            country_code = locData.countryCode || '';
-            city_code = locData.region || '';
-            timezone = locData.timezone || '';
-            isp = locData.isp || '';
-          } else {
-            console.error('IP-API返回错误状态码:', locRes.status);
-            // 不再重试，避免触发更多限流
+          const ipResponse = await fetch('https://ipinfo.io/json', { 
+            signal: controller2.signal 
+          });
+          if (ipResponse.ok) {
+            const ipData = await ipResponse.json();
+            ipAddress = ipData.ip;
+            // ipinfo同时提供了一些地理信息，可以直接使用
+            if (ipData.city && ipData.region && ipData.country) {
+              location = `${ipData.city}, ${ipData.region}, ${ipData.country}`;
+              country_code = ipData.country;
+              city_code = ipData.region;
+              timezone = ipData.timezone || '';
+            }
           }
-        } catch (geoError) {
-          console.error('地理位置获取失败，继续主流程:', geoError);
+        } catch (error) {
+          console.error('ipinfo服务获取IP失败:', error);
+        } finally {
+          clearTimeout(timeoutId2);
         }
       }
+      
+      // 不再使用IP-API服务，避免403错误
     } catch (error) {
-      console.error('获取IP/地理位置失败，继续主流程:', error);
+      console.error('获取IP地址失败，继续主流程:', error);
     }
 
     // 解析设备类型及相关信息

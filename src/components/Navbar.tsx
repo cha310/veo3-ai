@@ -54,53 +54,52 @@ const Navbar: React.FC = () => {
         console.log('Navbar: 检测到有效会话，用户ID:', session.user.id);
         
         try {
-          // 从Supabase获取用户资料
-          const { data, error } = await supabaseClient
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+          // 使用会话中的用户信息，不再尝试从数据库获取
+          const userData: UserData = {
+            id: session.user.id,
+            email: session.user.email || '',
+            name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
+            picture: session.user.user_metadata?.avatar_url,
+            credits: 0
+          };
           
-          if (error) {
-            console.error('获取用户资料失败:', error);
-            
-            // 使用会话中的用户信息
-            const userData: UserData = {
+          setUser(userData);
+          
+          // 尝试创建/更新用户记录
+          const { error: insertError } = await supabaseClient
+            .from('users')
+            .upsert([{
               id: session.user.id,
-              email: session.user.email || '',
-              name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
-              picture: session.user.user_metadata?.avatar_url,
-              credits: 0
-            };
-            
-            setUser(userData);
-            
-            // 尝试创建用户记录
-            const { error: insertError } = await supabaseClient
-              .from('users')
-              .upsert([{
-                id: session.user.id,
-                email: session.user.email,
-                name: userData.name,
-                avatar_url: userData.picture,
-                provider: 'google',
-                credits: 0,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              }], { onConflict: 'id' });
-            
-            if (insertError) {
-              console.error('更新用户记录失败:', insertError);
+              email: session.user.email,
+              name: userData.name,
+              avatar_url: userData.picture,
+              provider: 'google',
+              credits: 0,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }], { onConflict: 'id' });
+          
+          if (insertError) {
+            console.error('更新用户记录失败:', insertError);
+          } else {
+            // 如果更新成功，再尝试获取最新的积分信息
+            try {
+              const { data: userData, error: fetchError } = await supabaseClient.rpc(
+                'get_user_credits',
+                { user_id: session.user.id }
+              );
+              
+              if (!fetchError && userData) {
+                setUser(prev => {
+                  if (prev) {
+                    return { ...prev, credits: userData.credits || 0 };
+                  }
+                  return prev;
+                });
+              }
+            } catch (creditsError) {
+              console.error('获取用户积分失败:', creditsError);
             }
-          } else if (data) {
-            // 使用数据库中的用户信息
-            setUser({
-              id: session.user.id,
-              email: session.user.email || data.email || '',
-              name: data.name || session.user.user_metadata?.name || 'User',
-              picture: data.avatar_url || session.user.user_metadata?.avatar_url,
-              credits: data.credits || 0
-            });
           }
         } catch (err) {
           console.error('处理用户资料异常:', err);
