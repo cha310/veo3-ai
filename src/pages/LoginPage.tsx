@@ -16,12 +16,16 @@ const LoginPage = () => {
     if (session) {
       navigate('/');
     }
+    // 确保进入登录页后滚动到顶部
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [session, navigate]);
 
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-[#000] flex items-center justify-center py-16 px-4 text-white">
+      <div className="min-h-screen bg-gradient-to-b from-[#1b1e26] via-[#12151c] to-[#0b0d12] flex items-center justify-center py-16 px-4 text-white relative overflow-hidden">
+        {/* 背景柔光圆 */}
+        <div className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[480px] h-[480px] bg-[#6C5CE7]/20 blur-3xl rounded-full"></div>
         <div className="w-full max-w-md bg-[#1f1f25] rounded-xl overflow-hidden shadow-2xl">
           {/* 顶部展示图 */}
           <div className="h-56 w-full overflow-hidden">
