@@ -39,14 +39,44 @@ export const recordLoginActivity = async (
     let city_code = '';
     let timezone = '';
     let isp = '';
+    
+    // 尝试获取IP地址 - 使用多个备选服务
     try {
-      const ipResponse = await fetch('https://api.ipify.org?format=json');
-      if (ipResponse.ok) {
+      // 首选服务
+      const controller1 = new AbortController();
+      const timeoutId1 = setTimeout(() => controller1.abort(), 3000);
+      let ipResponse = await fetch('https://api.ipify.org?format=json', { signal: controller1.signal });
+      clearTimeout(timeoutId1);
+      
+      if (!ipResponse.ok) {
+        // 备选服务1
+        const controller2 = new AbortController();
+        const timeoutId2 = setTimeout(() => controller2.abort(), 3000);
+        ipResponse = await fetch('https://ipinfo.io/json', { signal: controller2.signal });
+        clearTimeout(timeoutId2);
+        
+        if (ipResponse.ok) {
+          const ipData = await ipResponse.json();
+          ipAddress = ipData.ip;
+        }
+      } else {
         const ipData = await ipResponse.json();
         ipAddress = ipData.ip;
-        // 获取地理位置
+      }
+      
+      // 只有在成功获取IP后才尝试获取地理位置
+      if (ipAddress !== 'unknown') {
         try {
-          const locRes = await fetch(`https://ip-api.com/json/${ipAddress}?fields=city,region,regionName,country,countryCode,lat,lon,timezone,isp`);
+          // 使用IP-API但添加超时和重试限制
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2000); // 2秒超时
+          
+          const locRes = await fetch(
+            `https://ip-api.com/json/${ipAddress}?fields=city,region,regionName,country,countryCode,lat,lon,timezone,isp`, 
+            { signal: controller.signal }
+          );
+          clearTimeout(timeoutId);
+          
           if (locRes.ok) {
             const locData = await locRes.json();
             location = [locData.city, locData.regionName, locData.country].filter(Boolean).join(', ');
@@ -58,6 +88,7 @@ export const recordLoginActivity = async (
             isp = locData.isp || '';
           } else {
             console.error('IP-API返回错误状态码:', locRes.status);
+            // 不再重试，避免触发更多限流
           }
         } catch (geoError) {
           console.error('地理位置获取失败，继续主流程:', geoError);
