@@ -257,107 +257,98 @@ const Navbar: React.FC = () => {
 
       {/* Mobile menu */}
       {isMenuOpen && (
-      <div className="md:hidden bg-[#1a1e27] shadow-lg">
-        <div className="px-4 pt-2 pb-4 space-y-4">
-            <Link 
-              to="/" 
-            className={`block py-2 ${
-              isHomePage ? 'text-[#8A7CFF] font-medium' : 'text-white'
-              }`}
-            onClick={() => setIsMenuOpen(false)}
-            >
-              Home
-            </Link>
-          <div>
-            <div 
-              onClick={() => {
-                navigate('/create-video');
-                setIsMenuOpen(false);
-              }}
-              className={`block py-2 ${
-                isCreateVideoPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
-              }`}
-            >
-              AI Tools
-            </div>
-          </div>
-            <Link 
-              to="/video-effects" 
-            className={`block py-2 ${
-              isVideoEffectsPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
-            }`}
-            onClick={() => setIsMenuOpen(false)}
+      <div className="fixed inset-0 z-20 md:hidden bg-[#0c111b]/95 backdrop-blur-sm flex flex-col pt-24 px-6 space-y-8">
+        <Link 
+          to="/" 
+          className={`text-2xl ${isHomePage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
+          onClick={() => setIsMenuOpen(false)}
+        >
+          Home
+        </Link>
+        <div>
+          <div 
+            onClick={() => {
+              navigate('/create-video');
+              setIsMenuOpen(false);
+            }}
+            className={`${isCreateVideoPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'} text-2xl`}
           >
-            Video Effects
-          </Link>
-          <Link 
-            to="/pricing" 
-            className={`block py-2 ${
-              isPricingPage ? 'text-[#8A7CFF] font-medium' : 'text-white'
-            }`}
-            onClick={() => setIsMenuOpen(false)}
-          >
-            Pricing
-          </Link>
-          
-          {/* 移动端登录/用户菜单 */}
-          {isLoggedIn ? (
-            <div className="border-t border-[#343a4d] pt-4 mt-4">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
-                  {user?.picture ? (
-                    <img src={user.picture} alt={user.name || 'User'} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-[#343a4d] flex items-center justify-center">
-                      <User size={20} className="text-white" />
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <div className="text-white font-medium">{user?.name || session?.user?.email?.split('@')[0] || 'User'}</div>
-                  <div className="text-gray-400 text-sm">{user?.email || session?.user?.email || ''}</div>
-                </div>
-              </div>
-              
-              <Link 
-                to="/profile" 
-                className="block py-2 text-white"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Profile
-              </Link>
-              
-              <Link 
-                to="/settings" 
-                className="block py-2 text-white"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Settings
-              </Link>
-              
-              <button 
-                onClick={() => {
-                  handleLogout();
-                  setIsMenuOpen(false);
-                }}
-                className="block py-2 text-red-400 w-full text-left"
-              >
-                Sign out
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => {
-                navigate('/login');
-                setIsMenuOpen(false);
-              }}
-              className="block w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity mt-4"
-              >
-              Login
-              </button>
-            )}
+            AI Tools
           </div>
         </div>
+        <Link 
+          to="/video-effects" 
+          className={`text-2xl ${isVideoEffectsPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
+          onClick={() => setIsMenuOpen(false)}
+        >
+          Video Effects
+        </Link>
+        <Link 
+          to="/pricing" 
+          className={`text-2xl ${isPricingPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
+          onClick={() => setIsMenuOpen(false)}
+        >
+          Pricing
+        </Link>
+        
+        {/* 移动端登录/用户菜单 */}
+        {isLoggedIn ? (
+          <div className="border-t border-[#343a4d] pt-6 mt-6 space-y-4">
+            <div className="flex items-center mb-4">
+              <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                {user?.picture ? (
+                  <img src={user.picture} alt={user.name || 'User'} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-[#343a4d] flex items-center justify-center">
+                    <User size={20} className="text-white" />
+                  </div>
+                )}
+              </div>
+              <div>
+                <div className="text-white font-medium">{user?.name || session?.user?.email?.split('@')[0] || 'User'}</div>
+                <div className="text-gray-400 text-sm">{user?.email || session?.user?.email || ''}</div>
+              </div>
+            </div>
+            
+            <Link 
+              to="/profile" 
+              className="block py-2 text-white"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Profile
+            </Link>
+            
+            <Link 
+              to="/settings" 
+              className="block py-2 text-white"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Settings
+            </Link>
+            
+            <button 
+              onClick={() => {
+                handleLogout();
+                setIsMenuOpen(false);
+              }}
+              className="block py-2 text-red-400 w-full text-left"
+            >
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => {
+              navigate('/login');
+              setIsMenuOpen(false);
+            }}
+            className="block w-full bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity mt-4"
+            >
+            Login
+            </button>
+          )}
+        </div>
+      </div>
       )}
     </header>
   );
