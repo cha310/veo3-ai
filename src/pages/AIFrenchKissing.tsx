@@ -232,7 +232,6 @@ const AIFrenchKissing: React.FC = () => {
                 Try AI French Kiss Generator Now
               </button>
             </Link>
-            <p className="text-gray-400 mt-4">No credit card required • Free to try</p>
           </div>
         </div>
 
@@ -267,12 +266,6 @@ const AIFrenchKissing: React.FC = () => {
               <h3 className="text-xl font-medium text-white mb-2">How long does it take to generate a video?</h3>
               <p className="text-gray-300">
                 Most videos are generated within 30-60 seconds, depending on server load and the complexity of the photo. Once processing is complete, you can immediately download your video.
-              </p>
-            </div>
-            <div className="py-6">
-              <h3 className="text-xl font-medium text-white mb-2">Can I use the generated videos commercially?</h3>
-              <p className="text-gray-300">
-                Yes, you have full rights to use your generated videos for both personal and commercial purposes, as long as you have the appropriate rights to the original photo you uploaded.
               </p>
             </div>
           </div>

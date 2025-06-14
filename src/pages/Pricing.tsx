@@ -29,49 +29,47 @@ const Pricing: React.FC = () => {
   // Credit packages configuration
   const creditPacks = [
     {
-      id: 'starter',
-      name: 'Starter Pack',
-      credits: 200,
-      monthlyPrice: 12,
-      yearlyPrice: 6,
+      id: 'lite',
+      name: 'Lite',
+      monthlyPrice: 29.9,
+      yearlyPrice: 286,
       background: 'bg-[#1a242f]/90',
+      credits: 600,
       features: [
-        'Generate Kling 1.6 videos (20 credits each)',
-        'Up to 10 videos per month',
-        'Email support',
-        'Basic video effects'
+        '600 credits per month',
+        'Standard processing speed',
+        'Max 5 second videos',
       ]
     },
     {
       id: 'pro',
-      name: 'Pro Pack',
-      credits: 1000,
-      monthlyPrice: 49,
-      yearlyPrice: 25,
+      name: 'Pro',
+      monthlyPrice: 49.9,
+      yearlyPrice: 479,
       background: 'bg-[#121a22]/90',
       recommended: true,
+      credits: 1200,
       features: [
-        'Generate Kling 1.6 videos (20 credits each)',
-        'Generate Veo 2 videos (180 credits each)',
-        'Up to 50 videos',
+        '1200 credits per month',
+        'Fastest processing',
+        'Max 8 second videos',
+        'Commercial usage rights',
         'Priority support',
-        'Advanced video effects'
       ]
     },
     {
-      id: 'premium',
-      name: 'Premium Pack',
-      credits: 2000,
-      monthlyPrice: 89,
-      yearlyPrice: 45,
+      id: 'pro+',
+      name: 'Pro+',
+      monthlyPrice: 99.9,
+      yearlyPrice: 959,
       background: 'bg-[#28353d]/90',
+      credits: 2500,
       features: [
-        'Generate Kling 1.6 videos (20 credits each)',
-        'Generate Veo 2 videos (180 credits each)',
-        'Generate Veo 3 videos (330 credits each)',
-        'Unlimited video generation',
-        '24/7 customer support',
-        'All premium features'
+        '2500 credits per month',
+        'Fastest processing',
+        'Max 8 second videos',
+        'Commercial usage rights',
+        'Priority support',
       ]
     }
   ];
@@ -115,7 +113,9 @@ const Pricing: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#c94b31] via-[#2a3e4a] to-[#41968a]">
+    <div className="min-h-screen relative bg-gradient-to-b from-[#1b1e26] via-[#12151c] to-[#0b0d12] overflow-hidden">
+      {/* 背景柔光圆 */}
+      <div className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[480px] h-[480px] bg-[#6C5CE7]/20 blur-3xl rounded-full"></div>
       <Navbar />
       
       <main className="container mx-auto px-4 pt-32 pb-20">
@@ -123,12 +123,14 @@ const Pricing: React.FC = () => {
         <p className="text-center text-white opacity-80 mb-4 max-w-2xl mx-auto">
           Purchase credit packages to generate high-quality AI videos. Different AI models require different amounts of credits.
         </p>
-        <p className="text-center text-yellow-300 mb-10 max-w-2xl mx-auto bg-[#2C3640]/80 py-2 px-4 rounded-md inline-block">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline-block mr-1 mb-1" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-          </svg>
-          Payment system coming soon. Currently in development.
-        </p>
+        <div className="flex justify-center mb-10">
+          <p className="text-center text-yellow-300 bg-[#2C3640]/80 py-2 px-4 rounded-md inline-block">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline-block mr-1 mb-1" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            Payment system coming soon.
+          </p>
+        </div>
         
         {/* Display current credits */}
         {isLoggedIn && (
@@ -162,7 +164,7 @@ const Pricing: React.FC = () => {
               className={`py-2 px-6 rounded-full transition-all flex items-center gap-2 ${isYearly ? 'bg-white text-[#2c2c3d]' : 'text-gray-300'}`}
             >
               <span>Yearly</span>
-              {isYearly && <span className="bg-pink-500 text-white text-xs px-2 py-0.5 rounded-full">Save 50%</span>}
+              {isYearly && <span className="bg-pink-500 text-white text-xs px-2 py-0.5 rounded-full">Save 20%</span>}
             </button>
           </div>
         </div>
@@ -172,7 +174,7 @@ const Pricing: React.FC = () => {
           {creditPacks.map((pack) => (
             <div 
               key={pack.id}
-              className={`${pack.background} rounded-2xl p-8 text-white shadow-xl relative flex flex-col h-full ${pack.recommended ? 'transform hover:scale-105 transition-all z-10 border border-[#8A7CFF]/30' : ''}`}
+              className={`bg-[#1f1f25]/90 rounded-2xl p-8 text-white shadow-xl relative flex flex-col h-full transition-transform hover:-translate-y-2 hover:shadow-purple-800/40 hover:shadow-2xl ring-1 ring-[#2C3640] ${pack.recommended ? 'ring-2 ring-[#8A7CFF] z-10 hover:scale-105' : ''}`}
             >
               {pack.recommended && (
                 <div className="absolute top-3 right-3">
@@ -181,9 +183,6 @@ const Pricing: React.FC = () => {
               )}
               
               <h2 className="text-2xl font-bold mb-2 text-center">{pack.name}</h2>
-              <div className="text-center text-[#8A7CFF] font-bold mb-4">
-                {pack.credits} Credits
-              </div>
               <div className="flex items-end justify-center mb-8">
                 <span className="text-4xl font-bold">${isYearly ? pack.yearlyPrice : pack.monthlyPrice}</span>
                 {isYearly && (
@@ -211,47 +210,82 @@ const Pricing: React.FC = () => {
             </div>
           ))}
         </div>
-        
-        {/* Model credit consumption explanation */}
-        <div className="mt-16 max-w-3xl mx-auto">
-          <h3 className="text-2xl font-bold text-white text-center mb-6">Video Generation Credit Consumption</h3>
-          <div className="bg-[#1a242f]/60 rounded-xl p-6 text-white">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="bg-[#2C3640] p-4 rounded-lg">
-                <div className="flex items-center justify-center mb-2">
-                  <div className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center mr-2">
-                    <span className="text-white font-bold">K</span>
+
+        {/* Credit Packs (One-time purchase) */}
+        <section className="mt-24">
+          <h2 className="text-4xl font-bold text-white text-center mb-4">Credit Packs</h2>
+          <p className="text-center text-white opacity-80 mb-10 max-w-2xl mx-auto">
+            Purchase additional credits to generate more videos. Credits never expire and can be used anytime.
+          </p>
+
+          {/* Credit packs data */}
+          {(() => {
+            const oneTimePacks = [
+              {
+                id: 'starter',
+                name: 'Starter Pack',
+                credits: 1000,
+                price: 49.9,
+                background: 'bg-[#0f1722]/90',
+              },
+              {
+                id: 'creator',
+                name: 'Creator Pack',
+                credits: 2000,
+                price: 89.9,
+                background: 'bg-[#0f1722]/90',
+                popular: true,
+              },
+              {
+                id: 'business',
+                name: 'Business Pack',
+                credits: 4000,
+                price: 159.9,
+                background: 'bg-[#0f1722]/90',
+              },
+            ];
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+                {oneTimePacks.map((pack) => (
+                  <div
+                    key={pack.id}
+                    className={`bg-[#1f1f25]/90 rounded-2xl p-8 text-white shadow-xl relative flex flex-col h-full transition-transform hover:-translate-y-2 hover:shadow-purple-800/40 hover:shadow-2xl ring-1 ring-[#2C3640] ${pack.popular ? 'ring-2 ring-[#8A7CFF]' : ''}`}
+                  >
+                    {pack.popular && (
+                      <div className="absolute top-3 right-3">
+                        <span className="bg-pink-500 text-white text-xs px-2 py-1 rounded-full">Most Popular</span>
+                      </div>
+                    )}
+
+                    <h3 className="text-2xl font-bold mb-1 text-center mt-4">{pack.name}</h3>
+                    <p className="text-gray-400 text-center mb-8">{pack.id === 'starter' ? 'Great for occasional use' : pack.id === 'creator' ? 'Ideal for professional creators' : 'Best value for businesses & heavy users'}</p>
+
+                    <div className="text-center mb-6">
+                      <span className="text-5xl font-bold tracking-tight mr-1">{pack.credits.toLocaleString()}</span>
+                      <span className="text-xl text-gray-300">Credits</span>
+                    </div>
+
+                    <div className="text-center mb-8">
+                      <span className="text-3xl font-bold">${pack.price}</span>
+                    </div>
+
+                    <ul className="text-sm mb-10 space-y-2 px-2 flex flex-col items-start">
+                      <li className="flex items-center"><CheckCircle className="text-green-500 mr-2 h-4 w-4"/> Never expires</li>
+                    </ul>
+
+                    <button
+                      className="w-full py-3 px-4 rounded-lg font-medium bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white opacity-50 cursor-not-allowed"
+                      disabled
+                    >
+                      Purchase
+                    </button>
                   </div>
-                  <h4 className="text-lg font-semibold">Kling 1.6</h4>
-                </div>
-                <p className="text-center text-3xl font-bold text-[#8A7CFF]">20</p>
-                <p className="text-center text-sm text-gray-400">credits/video</p>
+                ))}
               </div>
-              
-              <div className="bg-[#2C3640] p-4 rounded-lg">
-                <div className="flex items-center justify-center mb-2">
-                  <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center mr-2">
-                    <span className="text-white font-bold">G</span>
-                  </div>
-                  <h4 className="text-lg font-semibold">Veo 2</h4>
-                </div>
-                <p className="text-center text-3xl font-bold text-[#8A7CFF]">180</p>
-                <p className="text-center text-sm text-gray-400">credits/video</p>
-              </div>
-              
-              <div className="bg-[#2C3640] p-4 rounded-lg">
-                <div className="flex items-center justify-center mb-2">
-                  <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center mr-2">
-                    <span className="text-white font-bold">G</span>
-                  </div>
-                  <h4 className="text-lg font-semibold">Veo 3</h4>
-                </div>
-                <p className="text-center text-3xl font-bold text-[#8A7CFF]">330</p>
-                <p className="text-center text-sm text-gray-400">credits/video</p>
-              </div>
-            </div>
-          </div>
-        </div>
+            );
+          })()}
+        </section>
       </main>
     </div>
   );

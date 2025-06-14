@@ -211,7 +211,8 @@ const Navbar: React.FC = () => {
             </div>
           </div>
           
-          <Link 
+          {/* 暂时隐藏Video Effects入口 */}
+          {/* <Link 
             to="/video-effects" 
             className={`transition-colors py-1.5 ${
                 isVideoEffectsPage 
@@ -220,7 +221,8 @@ const Navbar: React.FC = () => {
             }`}
           >
             Video Effects
-          </Link>
+          </Link> */}
+          
           <Link 
             to="/pricing" 
             className={`transition-colors py-1.5 ${
@@ -278,13 +280,16 @@ const Navbar: React.FC = () => {
               AI Tools
             </div>
           </div>
-          <Link 
+          
+          {/* 暂时隐藏移动端Video Effects入口 */}
+          {/* <Link 
             to="/video-effects" 
             className={`text-3xl ${isVideoEffectsPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
             onClick={() => setIsMenuOpen(false)}
           >
             Video Effects
-          </Link>
+          </Link> */}
+          
           <Link 
             to="/pricing" 
             className={`text-3xl ${isPricingPage ? 'text-[#8A7CFF] font-semibold' : 'text-white'}`}
