@@ -1,7 +1,7 @@
 import supabase from '../lib/supabase';
 
 /**
- * 记录用户登录信息
+ * 记录用户登录信息（1分钟内只插入一次）
  * @param userId 用户ID
  * @param provider 登录提供商（例如：google, github等）
  * @param userAgent 用户浏览器信息
@@ -13,6 +13,22 @@ export const recordLoginActivity = async (
   userAgent: string = navigator.userAgent
 ) => {
   try {
+    // 1. 查询1分钟内是否已有记录
+    const since = new Date(Date.now() - 60 * 1000).toISOString();
+    const { data: recent, error: queryError } = await supabase
+      .from('login_logs')
+      .select('id')
+      .eq('user_id', userId)
+      .gte('login_time', since)
+      .limit(1);
+    if (queryError) {
+      console.error('查询登录去重失败:', queryError);
+      // 查询失败时，保险起见还是允许插入
+    } else if (recent && recent.length > 0) {
+      // 1分钟内已有记录，不再插入
+      return { success: true, skipped: true, message: '1分钟内已记录，无需重复插入' };
+    }
+
     // 获取IP地址（通过外部服务）
     let ipAddress = 'unknown';
     try {

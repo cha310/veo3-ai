@@ -2,7 +2,6 @@ import React from 'react';
 import Modal from 'react-modal';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { X } from 'lucide-react';
-import { recordLoginActivity } from '../services/loginLogService';
 
 interface GoogleLoginModalProps {
   isOpen: boolean;
@@ -37,24 +36,6 @@ const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({ isOpen, onRequestCl
         if (event === 'SIGNED_IN') {
           popup?.close();
           listener.subscription.unsubscribe();
-          
-          // 获取当前登录用户信息并记录登录
-          supabaseClient.auth.getUser().then(({ data: { user } }) => {
-            if (user) {
-              const provider = user.app_metadata?.provider || 'google';
-              recordLoginActivity(user.id, provider)
-                .then(result => {
-                  if (result.success) {
-                    console.log('登录弹窗: 登录记录已保存');
-                  } else {
-                    console.error('登录弹窗: 保存登录记录失败:', result.error);
-                  }
-                })
-                .catch(error => {
-                  console.error('登录弹窗: 记录登录信息异常:', error);
-                });
-            }
-          });
           
           onRequestClose();
         }
