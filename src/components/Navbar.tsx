@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
 import UserMenu from './UserMenu';
 import GoogleLoginModal from './GoogleLoginModal';
+import { useCredits } from '../contexts/CreditContext';
 
 interface UserData {
   id?: string;
@@ -20,6 +21,9 @@ const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
+  
+  // 使用积分上下文
+  const { totalCredits, connectionState, connectionType } = useCredits();
 
   // 使用Supabase Auth Helpers获取会话
   const session = useSession();
@@ -60,7 +64,7 @@ const Navbar: React.FC = () => {
             email: session.user.email || '',
             name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
             picture: session.user.user_metadata?.avatar_url,
-            credits: 0
+            credits: totalCredits // 使用CreditContext中的积分
           };
           
           setUser(userData);
@@ -74,32 +78,12 @@ const Navbar: React.FC = () => {
               name: userData.name,
               avatar_url: userData.picture,
               provider: 'google',
-              credits: 0,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             }], { onConflict: 'id' });
           
           if (insertError) {
             console.error('更新用户记录失败:', insertError);
-          } else {
-            // 如果更新成功，再尝试获取最新的积分信息
-            try {
-              const { data: userData, error: fetchError } = await supabaseClient.rpc(
-                'get_user_credits',
-                { user_id: session.user.id }
-              );
-              
-              if (!fetchError && userData) {
-                setUser(prev => {
-                  if (prev) {
-                    return { ...prev, credits: userData.credits || 0 };
-                  }
-                  return prev;
-                });
-              }
-            } catch (creditsError) {
-              console.error('获取用户积分失败:', creditsError);
-            }
           }
         } catch (err) {
           console.error('处理用户资料异常:', err);
@@ -111,16 +95,36 @@ const Navbar: React.FC = () => {
     };
     
     updateUserState();
-  }, [session, supabaseClient]);
+  }, [session, supabaseClient, totalCredits]);
 
   // 显示用户积分
   const renderUserCredits = () => {
     if (!user) return null;
     
+    // 根据连接状态显示不同的图标或样式
+    const getConnectionIcon = () => {
+      switch (connectionType) {
+        case 'websocket':
+          return <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>;
+        case 'sse':
+          return <span className="w-2 h-2 bg-yellow-500 rounded-full mr-1"></span>;
+        case 'polling':
+          return <span className="w-2 h-2 bg-blue-500 rounded-full mr-1"></span>;
+        default:
+          return null;
+      }
+    };
+    
     return (
-      <div className="flex items-center text-white text-sm mr-3">
+      <div className="flex items-center text-white text-sm mr-3 group relative">
+        {getConnectionIcon()}
         <CreditCard size={16} className="text-[#8A7CFF] mr-1" />
-        <span className="text-[#8A7CFF] font-medium">{user.credits || 0}</span>
+        <span className="text-[#8A7CFF] font-medium">{totalCredits || 0}</span>
+        
+        {/* 连接状态提示 */}
+        <div className="absolute bottom-full left-0 mb-2 bg-[#1a1e27] rounded-md p-2 text-xs text-white shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-150 whitespace-nowrap">
+          连接状态: {connectionState} ({connectionType})
+        </div>
       </div>
     );
   };
@@ -137,7 +141,7 @@ const Navbar: React.FC = () => {
       if (error) {
         console.error('登出错误:', error);
       } else {
-    setUser(null);
+        setUser(null);
         // 登出后跳转到首页
         navigate('/');
       }
@@ -248,11 +252,11 @@ const Navbar: React.FC = () => {
               />
             </div>
           ) : (
-            <button 
+            <button
               onClick={handleLogin}
-              className="bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
+              className="bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
             >
-              Login
+              登录
             </button>
           )}
         </div>

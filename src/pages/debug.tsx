@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { simulateSubscriptionSuccess } from '../services/subscriptionService';
 import { fetchUserCredits, validateUserCredits } from '../services/creditService';
+import { useCredits } from '../contexts/CreditContext';
 
 const DebugPage: React.FC = () => {
   const session = useSession();
@@ -18,6 +19,15 @@ const DebugPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
   const [validationResult, setValidationResult] = useState<any>(null);
+  
+  // 使用积分上下文
+  const { 
+    totalCredits, 
+    balances, 
+    connectionState, 
+    connectionType, 
+    refreshCredits 
+  } = useCredits();
 
   // 获取本地存储数据
   useEffect(() => {
@@ -134,6 +144,41 @@ const DebugPage: React.FC = () => {
             </div>
           )}
           
+          {/* 实时积分余额状态 */}
+          <div className="bg-[#1a1e27] p-6 rounded-lg mb-6">
+            <h2 className="text-xl font-bold mb-4">实时积分余额状态</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="mb-2">总积分: <span className="font-bold">{totalCredits}</span></p>
+                <p className="mb-2">连接状态: <span className="font-bold">{connectionState}</span></p>
+                <p className="mb-2">连接类型: <span className="font-bold">{connectionType}</span></p>
+                <button 
+                  onClick={() => refreshCredits()}
+                  className="mt-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-md"
+                >
+                  刷新积分
+                </button>
+              </div>
+              <div>
+                <h3 className="font-bold mb-2">积分明细:</h3>
+                <div className="bg-[#0d1117] p-4 rounded-md overflow-auto max-h-48">
+                  {balances.length > 0 ? (
+                    <ul>
+                      {balances.map((balance, index) => (
+                        <li key={index} className="mb-1">
+                          {balance.amount} 积分 
+                          {balance.expires_at && ` (到期: ${new Date(balance.expires_at).toLocaleDateString()})`}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>无积分明细</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div className="bg-[#1a1e27] p-6 rounded-lg">
               <h2 className="text-xl font-bold mb-4">用户状态</h2>
@@ -179,8 +224,8 @@ const DebugPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white shadow-md rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">当前积分: {credits !== null ? credits : '加载中...'}</h2>
+          <div className="bg-white shadow-md rounded-lg p-6 mb-6 mt-6">
+            <h2 className="text-xl font-semibold mb-4 text-gray-800">当前积分: {credits !== null ? credits : '加载中...'}</h2>
             
             <div className="mb-4">
               <label className="block text-gray-700 mb-2">用户ID:</label>
@@ -233,7 +278,7 @@ const DebugPage: React.FC = () => {
           
           {result && (
             <div className="bg-white shadow-md rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-2">订阅结果:</h2>
+              <h2 className="text-xl font-semibold mb-2 text-gray-800">订阅结果:</h2>
               <pre className="bg-gray-100 p-3 rounded overflow-auto max-h-60">
                 {JSON.stringify(result, null, 2)}
               </pre>
@@ -242,7 +287,7 @@ const DebugPage: React.FC = () => {
           
           {validationResult && (
             <div className="bg-white shadow-md rounded-lg p-6">
-              <h2 className="text-xl font-semibold mb-2">验证结果:</h2>
+              <h2 className="text-xl font-semibold mb-2 text-gray-800">验证结果:</h2>
               <pre className="bg-gray-100 p-3 rounded overflow-auto max-h-60">
                 {JSON.stringify(validationResult, null, 2)}
               </pre>

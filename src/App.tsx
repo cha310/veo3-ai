@@ -23,6 +23,7 @@ import LoginPage from './pages/LoginPage';
 import supabase from './lib/supabase.ts';
 import { recordLoginActivity } from './services/loginLogService';
 import ASMRVideo from './pages/ASMRVideo';
+import { CreditProvider } from './contexts/CreditContext';
 
 // 从环境变量获取Google OAuth客户端ID
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1049691614917-7ncrqa4qmmg4oiamn8i1dfbrvphicoju.apps.googleusercontent.com';
@@ -100,37 +101,39 @@ function App() {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <SessionContextProvider supabaseClient={supabase}>
-        <BrowserRouter>
-          <CanonicalHead baseUrl={SITE_URL} />
-        <div className="min-h-screen bg-[#121a22]">
-          <Routes>
-            <Route path="/" element={
-              <>
-                <Navbar />
-                <main>
-                  <Hero />
-                  <VideoGallery />
-                  <Features />
-                    <HowToCreate />
-                  <FAQ />
-                </main>
-                <Footer />
-              </>
-            } />
-            <Route path="/video-effects" element={<VideoEffects />} />
-              <Route path="/create-video" element={<TextToVideo />} />
-              <Route path="/pricing" element={<Pricing />} />
-              <Route path="/terms-of-service" element={<TermsOfService />} />
-              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-              <Route path="/refund-policy" element={<RefundPolicy />} />
-              <Route path="/ai-french-kissing" element={<AIFrenchKissing />} />
-              <Route path="/admin-logs" element={<AdminLogs />} />
-              <Route path="/debug" element={<DebugPage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/asmr-video" element={<ASMRVideo />} />
-          </Routes>
-        </div>
-        </BrowserRouter>
+        <CreditProvider>
+          <BrowserRouter>
+            <CanonicalHead baseUrl={SITE_URL} />
+            <div className="min-h-screen bg-[#121a22]">
+              <Routes>
+                <Route path="/" element={
+                  <>
+                    <Navbar />
+                    <main>
+                      <Hero />
+                      <VideoGallery />
+                      <Features />
+                      <HowToCreate />
+                      <FAQ />
+                    </main>
+                    <Footer />
+                  </>
+                } />
+                <Route path="/video-effects" element={<VideoEffects />} />
+                <Route path="/create-video" element={<TextToVideo />} />
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/terms-of-service" element={<TermsOfService />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/refund-policy" element={<RefundPolicy />} />
+                <Route path="/ai-french-kissing" element={<AIFrenchKissing />} />
+                <Route path="/admin-logs" element={<AdminLogs />} />
+                <Route path="/debug" element={<DebugPage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/asmr-video" element={<ASMRVideo />} />
+              </Routes>
+            </div>
+          </BrowserRouter>
+        </CreditProvider>
       </SessionContextProvider>
     </GoogleOAuthProvider>
   );
