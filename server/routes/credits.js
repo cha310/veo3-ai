@@ -65,7 +65,7 @@ router.get('/balance', verifyAuth, async (req, res) => {
     const userId = req.user.id;
 
     // 调用存储过程获取总积分
-    const { data: totalRows, error: totalErr } = await supabase.rpc('get_user_credits', { user_id: userId });
+    const { data: totalRows, error: totalErr } = await supabase.rpc('get_user_credits', { p_user_id: userId });
     if (totalErr) {
       console.error('获取总积分失败:', totalErr);
       return res.status(500).json({ success: false, message: '获取积分失败' });
@@ -73,7 +73,7 @@ router.get('/balance', verifyAuth, async (req, res) => {
     const totalCredits = Array.isArray(totalRows) && totalRows.length ? totalRows[0].credits : 0;
 
     // 调用存储过程获取有效积分明细
-    const { data: balances, error: balErr } = await supabase.rpc('get_user_credit_balances', { user_id: userId });
+    const { data: balances, error: balErr } = await supabase.rpc('get_user_credit_balances', { p_user_id: userId });
     if (balErr) {
       console.error('获取积分明细失败:', balErr);
       return res.status(500).json({ success: false, message: '获取积分失败' });
@@ -135,7 +135,7 @@ router.post('/add/subscription', verifyAuth, async (req, res) => {
     }
     
     // 获取更新后的用户积分
-    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id });
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { p_user_id: user_id });
     
     if (creditsError) {
       console.error('获取用户积分失败:', creditsError);
@@ -225,7 +225,7 @@ router.post('/add/purchase', verifyAuth, async (req, res) => {
     }
     
     // 获取更新后的用户积分
-    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id });
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { p_user_id: user_id });
     
     if (creditsError) {
       console.error('获取用户积分失败:', creditsError);
@@ -294,7 +294,7 @@ router.post('/add/manual', verifyAuth, verifyAdmin, async (req, res) => {
     }
     
     // 获取更新后的用户积分
-    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id });
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { p_user_id: user_id });
     
     if (creditsError) {
       console.error('获取用户积分失败:', creditsError);
@@ -380,7 +380,7 @@ router.post('/consume', verifyAuth, async (req, res) => {
     }
     
     // 获取更新后的用户积分
-    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id: userId });
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { p_user_id: userId });
     
     if (creditsError) {
       console.error('获取用户积分失败:', creditsError);
@@ -480,7 +480,7 @@ router.post('/transactions', verifyAuth, verifyAdmin, async (req, res) => {
     }
     
     // 获取用户当前积分余额
-    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id });
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { p_user_id: user_id });
     
     if (creditsError) {
       console.error('获取用户积分失败:', creditsError);
@@ -625,7 +625,7 @@ router.post('/batch-transactions', verifyAuth, verifyAdmin, async (req, res) => 
     const userCreditsMap = {};
     
     for (const userId of userIds) {
-      const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id: userId });
+      const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { p_user_id: userId });
       
       if (creditsError) {
         console.error(`获取用户 ${userId} 积分失败:`, creditsError);
@@ -744,7 +744,7 @@ router.post('/consume/video', verifyAuth, async (req, res) => {
     }
     
     // 检查用户积分是否足够
-    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id: userId });
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { p_user_id: userId });
     
     if (creditsError) {
       console.error('获取用户积分失败:', creditsError);
@@ -814,7 +814,7 @@ router.post('/consume/video', verifyAuth, async (req, res) => {
     }
     
     // 获取最新的积分余额
-    const { data: updatedCredits, error: updatedError } = await supabase.rpc('get_user_credits', { user_id: userId });
+    const { data: updatedCredits, error: updatedError } = await supabase.rpc('get_user_credits', { p_user_id: userId });
     
     if (updatedError) {
       console.error('获取更新后的用户积分失败:', updatedError);
@@ -916,7 +916,7 @@ router.post('/check/video', verifyAuth, async (req, res) => {
     }
     
     // 获取用户当前积分余额
-    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id: userId });
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { p_user_id: userId });
     
     if (creditsError) {
       console.error('获取用户积分失败:', creditsError);
@@ -968,7 +968,7 @@ router.post('/validate', verifyAuth, async (req, res) => {
     }
     
     // 获取最新的用户积分
-    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id: userId });
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { p_user_id: userId });
     
     if (creditsError) {
       console.error('获取用户积分失败:', creditsError);
@@ -1016,7 +1016,7 @@ router.post('/validate/admin/:userId', verifyAuth, verifyAdmin, async (req, res)
     }
     
     // 获取最新的用户积分
-    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id: userId });
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { p_user_id: userId });
     
     if (creditsError) {
       console.error('获取用户积分失败:', creditsError);
