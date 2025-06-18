@@ -78,6 +78,7 @@ app.use((req, res, next) => {
 // 导入路由
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const creditRoutes = require('./routes/credits');
 
 // 静态文件
 const distPath = path.join(__dirname, '../dist');
@@ -87,6 +88,7 @@ app.use(express.static(distPath));
 // 注册API路由
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/credits', creditRoutes);
 
 // 添加健康检查端点
 app.get('/health', (req, res) => {

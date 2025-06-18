@@ -173,6 +173,7 @@
     "util-deprecate": "^1.0.2",
     "utils-merge": "^1.0.1",
     "uuid": "^9.0.1",
+    "@supabase/supabase-js": "^2.42.3",
     "vary": "^1.1.2",
     "webidl-conversions": "^3.0.1",
     "whatwg-url": "^5.0.0",

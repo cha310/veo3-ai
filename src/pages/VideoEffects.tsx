@@ -90,7 +90,31 @@ const VideoEffects: React.FC = () => {
                 </Link>
               </div>
 
-              
+              <div className="bg-[#1a242f] rounded-lg overflow-hidden group hover:shadow-lg hover:shadow-[#8A7CFF]/20 transition-all">
+                <Link to="/asmr-video">
+                  <div className="relative aspect-video bg-gray-800">
+                    {/* 视频/图片位置 */}
+                    <div className="absolute inset-0 flex items-center justify-center text-white">
+                      <video
+                        className="w-full h-full object-cover"
+                        autoPlay
+                        loop
+                        muted
+                        poster="/images/ai-animation-generator.jpg"
+                      >
+                        <source src="/videos/asmr1.mp4" type="video/mp4" />
+                      </video>
+                    </div>
+                    <div className="absolute top-2 left-2">
+                      <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">New</span>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="text-white font-medium text-lg">Veo3 ASMR Video</h3>
+                  </div>
+                </Link>
+              </div>
+
               {/* 创建视频特效的横幅 */}
               <div className="col-span-full my-8">
                 <div className="relative bg-gradient-to-r from-[#1e293b] to-[#0f172a] rounded-lg overflow-hidden">
@@ -99,13 +123,20 @@ const VideoEffects: React.FC = () => {
                       <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">Create AI Video Effects Instantly</h2>
                       <p className="text-gray-300">Upload a photo to our AI video generator and create amazing video effects with just one click. Try our advanced video effects for free!</p>
                       <button className="mt-4 px-6 py-2.5 bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] text-white rounded-lg hover:shadow-lg hover:shadow-[#8A7CFF]/20 transition-all">
-                        Try for Free
+                        Create AI Video Now
                       </button>
                     </div>
                     <div className="relative w-full md:w-[40%] aspect-video rounded-lg overflow-hidden bg-gray-800">
                       {/* 这里放置横幅视频或图片 */}
                       <div className="absolute inset-0 flex items-center justify-center text-white">
-                        <span>Video Demo</span>
+                        <video 
+                          className="w-full h-full object-cover" 
+                          autoPlay 
+                          loop 
+                          muted
+                        >
+                          <source src="/videos/asmr3.mp4" type="video/mp4" />
+                        </video>
                       </div>
                     </div>
                   </div>

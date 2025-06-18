@@ -22,6 +22,7 @@ import DebugPage from './pages/debug';
 import LoginPage from './pages/LoginPage';
 import supabase from './lib/supabase.ts';
 import { recordLoginActivity } from './services/loginLogService';
+import ASMRVideo from './pages/ASMRVideo';
 
 // 从环境变量获取Google OAuth客户端ID
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1049691614917-7ncrqa4qmmg4oiamn8i1dfbrvphicoju.apps.googleusercontent.com';
@@ -126,6 +127,7 @@ function App() {
               <Route path="/admin-logs" element={<AdminLogs />} />
               <Route path="/debug" element={<DebugPage />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/asmr-video" element={<ASMRVideo />} />
           </Routes>
         </div>
         </BrowserRouter>
