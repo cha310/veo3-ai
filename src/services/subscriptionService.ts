@@ -36,7 +36,7 @@ export const handleSubscriptionSuccess = async (
     }
 
     // 调用积分发放API
-    const response = await apiService.post('/credits/add/subscription', {
+    const response = await apiService.post('/api/credits/add/subscription', {
       user_id: userId,
       amount: creditConfig.credits,
       subscription_id: subscriptionId,
@@ -63,13 +63,23 @@ export const simulateSubscriptionSuccess = async (
   planId: 'lite' | 'pro' | 'pro_plus'
 ): Promise<any> => {
   try {
-    // 生成模拟的订阅ID
-    const subscriptionId = `sub_${Math.random().toString(36).substring(2, 15)}`;
+    // 获取订阅计划对应的积分配置
+    const creditConfig = SUBSCRIPTION_CREDIT_CONFIG[planId];
+    if (!creditConfig) {
+      throw new Error(`未知的订阅计划: ${planId}`);
+    }
     
     console.log(`模拟订阅成功: 用户${userId}订阅了${planId}计划`);
     
-    // 调用订阅成功处理函数
-    return await handleSubscriptionSuccess(userId, subscriptionId, planId);
+    // 调用测试接口发放积分
+    const response = await apiService.post('/api/credits/test/add', {
+      user_id: userId,
+      amount: creditConfig.credits,
+      plan_id: planId
+    });
+
+    console.log(`测试订阅积分发放成功: 用户${userId}收到${creditConfig.credits}积分`);
+    return response;
   } catch (error) {
     console.error('模拟订阅失败:', error);
     throw error;
@@ -96,7 +106,7 @@ export const handleMonthlyCreditsAllocation = async (
     }
 
     // 调用积分发放API
-    const response = await apiService.post('/credits/add/subscription', {
+    const response = await apiService.post('/api/credits/add/subscription', {
       user_id: userId,
       amount: creditConfig.credits,
       subscription_id: subscriptionId,

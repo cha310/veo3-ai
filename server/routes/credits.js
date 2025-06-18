@@ -1118,4 +1118,284 @@ router.post('/validate-all', verifyAuth, verifyAdmin, async (req, res) => {
   }
 });
 
+// POST /api/credits/test/add - 测试用的积分发放API（不需要认证）
+router.post('/test/add', async (req, res) => {
+  try {
+    // 验证请求体
+    const { user_id, amount, plan_id } = req.body;
+    
+    if (!user_id || !amount) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '缺少必要参数',
+        error: { code: 'INVALID_PARAMETERS' } 
+      });
+    }
+    
+    if (amount <= 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '积分数量必须为正数',
+        error: { code: 'INVALID_PARAMETERS' } 
+      });
+    }
+    
+    // 生成模拟的订阅ID
+    const subscription_id = `test_sub_${Math.random().toString(36).substring(2, 15)}`;
+    
+    // 调用存储过程添加积分
+    const { data, error } = await supabase.rpc('add_credits', {
+      p_user_id: user_id,
+      p_amount: amount,
+      p_type: 'subscription',
+      p_source: subscription_id,
+      p_source_id: plan_id || 'test',
+      p_expires_in: null,
+      p_description: `测试${plan_id || '默认'}订阅积分`
+    });
+    
+    if (error) {
+      console.error('测试发放积分失败:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: '发放积分失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    // 获取更新后的用户积分
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { p_user_id: user_id });
+    
+    if (creditsError) {
+      console.error('获取用户积分失败:', creditsError);
+    }
+    
+    const totalCredits = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        transaction_id: data || 'unknown',
+        amount,
+        balance_after: totalCredits,
+        expires_at: null
+      }
+    });
+  } catch (err) {
+    console.error('测试发放积分接口报错:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: '服务器内部错误',
+      error: { code: 'INTERNAL_ERROR' } 
+    });
+  }
+});
+
+// POST /api/credits/test/validate - 测试用的积分验证API（不需要认证）
+router.post('/test/validate', async (req, res) => {
+  try {
+    const { user_id } = req.body;
+    
+    if (!user_id) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '缺少用户ID',
+        error: { code: 'INVALID_PARAMETERS' } 
+      });
+    }
+    
+    // 调用存储过程验证用户积分
+    const { data, error } = await supabase.rpc('validate_user_credits', { p_user_id: user_id });
+    
+    if (error) {
+      console.error('测试验证用户积分失败:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: '验证积分失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    // 获取最新的用户积分
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { p_user_id: user_id });
+    
+    if (creditsError) {
+      console.error('获取用户积分失败:', creditsError);
+      return res.status(500).json({ 
+        success: false, 
+        message: '获取积分失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    const totalCredits = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        was_repaired: data === true,
+        current_credits: totalCredits
+      }
+    });
+  } catch (err) {
+    console.error('测试验证用户积分接口报错:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: '服务器内部错误',
+      error: { code: 'INTERNAL_ERROR' } 
+    });
+  }
+});
+
+// GET /api/credits/test/balance - 测试用的获取积分余额API（不需要认证）
+router.get('/test/balance', async (req, res) => {
+  try {
+    const { user_id } = req.query;
+    
+    if (!user_id) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '缺少用户ID',
+        error: { code: 'INVALID_PARAMETERS' } 
+      });
+    }
+
+    // 调用存储过程获取总积分
+    const { data: totalRows, error: totalErr } = await supabase.rpc('get_user_credits', { p_user_id: user_id });
+    if (totalErr) {
+      console.error('测试获取总积分失败:', totalErr);
+      return res.status(500).json({ success: false, message: '获取积分失败' });
+    }
+    const totalCredits = Array.isArray(totalRows) && totalRows.length ? totalRows[0].credits : 0;
+
+    // 调用存储过程获取有效积分明细
+    const { data: balances, error: balErr } = await supabase.rpc('get_user_credit_balances', { p_user_id: user_id });
+    if (balErr) {
+      console.error('测试获取积分明细失败:', balErr);
+      return res.status(500).json({ success: false, message: '获取积分失败' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        total_credits: totalCredits,
+        balances: balances || []
+      }
+    });
+  } catch (err) {
+    console.error('测试查询积分余额接口报错:', err);
+    res.status(500).json({ success: false, message: '服务器内部错误' });
+  }
+});
+
+// POST /api/credits/deduct/manual - 管理员手动扣除积分
+router.post('/deduct/manual', verifyAuth, verifyAdmin, async (req, res) => {
+  try {
+    // 验证请求体
+    const { user_id, amount, reason } = req.body;
+    
+    if (!user_id || !amount) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '缺少必要参数',
+        error: { code: 'INVALID_PARAMETERS' } 
+      });
+    }
+    
+    if (amount <= 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '扣除积分数量必须为正数',
+        error: { code: 'INVALID_PARAMETERS' } 
+      });
+    }
+    
+    // 获取用户当前积分
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { p_user_id: user_id });
+    
+    if (creditsError) {
+      console.error('获取用户积分失败:', creditsError);
+      return res.status(500).json({ 
+        success: false, 
+        message: '获取用户积分失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    const currentCredits = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
+    
+    // 检查积分是否足够
+    if (currentCredits < amount) {
+      return res.status(400).json({
+        success: false,
+        message: '用户积分不足',
+        error: {
+          code: 'INSUFFICIENT_CREDITS',
+          details: {
+            required: amount,
+            available: currentCredits
+          }
+        }
+      });
+    }
+    
+    // 调用存储过程消费积分
+    const { data, error } = await supabase.rpc('consume_credits', {
+      p_user_id: user_id,
+      p_amount: amount,
+      p_type: 'adjustment',
+      p_source: 'manual',
+      p_description: reason || '管理员手动扣除'
+    });
+    
+    if (error) {
+      console.error('手动扣除积分失败:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: '扣除积分失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    // 如果返回false，表示积分不足（虽然前面已经检查过，这里是双重保险）
+    if (data === false) {
+      return res.status(400).json({
+        success: false,
+        message: '用户积分不足',
+        error: {
+          code: 'INSUFFICIENT_CREDITS',
+          details: {
+            required: amount,
+            available: currentCredits
+          }
+        }
+      });
+    }
+    
+    // 获取更新后的用户积分
+    const { data: updatedCredits, error: updatedError } = await supabase.rpc('get_user_credits', { p_user_id: user_id });
+    
+    if (updatedError) {
+      console.error('获取更新后的用户积分失败:', updatedError);
+    }
+    
+    const updatedTotalCredits = Array.isArray(updatedCredits) && updatedCredits.length ? updatedCredits[0].credits : 0;
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        amount,
+        balance_after: updatedTotalCredits
+      }
+    });
+  } catch (err) {
+    console.error('手动扣除积分接口报错:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: '服务器内部错误',
+      error: { code: 'INTERNAL_ERROR' } 
+    });
+  }
+});
+
 module.exports = router; 

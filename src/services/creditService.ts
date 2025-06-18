@@ -1,4 +1,7 @@
 // Define credit consumption constants
+import apiService from './apiService';
+import supabase from '../lib/supabase';
+
 export const CREDIT_COSTS = {
   'kling-1.6': 20,   // Kling 1.6 costs 20 credits
   'veo-2': 180,      // Veo 2 costs 180 credits
@@ -44,26 +47,32 @@ const getAuthHeaders = (): HeadersInit => {
 // 从API获取用户积分余额
 export const fetchUserCredits = async (): Promise<{ total: number, balances: CreditBalance[] }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/balance`, {
-      method: 'GET',
-      headers: getAuthHeaders()
-    });
-    
-    if (!response.ok) {
-      throw new Error(`获取积分失败: ${response.status}`);
+    // 从本地存储获取用户ID
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      return { total: 0, balances: [] };
     }
     
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.message || '获取积分失败');
+    const user = JSON.parse(userData);
+    const userId = user.id;
+    
+    if (!userId) {
+      return { total: 0, balances: [] };
+    }
+    
+    // 使用测试接口获取积分余额
+    const response = await apiService.get(`/api/credits/test/balance?user_id=${userId}`);
+    
+    if (!response.success) {
+      throw new Error(response.message || '获取积分失败');
     }
     
     // 更新本地存储的积分
-    updateLocalUserCredits(data.data.total_credits);
+    updateLocalUserCredits(response.data.total_credits);
     
     return {
-      total: data.data.total_credits,
-      balances: data.data.balances
+      total: response.data.total_credits,
+      balances: response.data.balances
     };
   } catch (error) {
     console.error('获取用户积分失败:', error);
@@ -584,29 +593,33 @@ export interface ValidateCreditsResult {
 // 验证并修复当前用户积分余额
 export const validateUserCredits = async (): Promise<ValidateCreditsResult> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/validate`, {
-      method: 'POST',
-      headers: getAuthHeaders()
+    // 从本地存储获取用户ID
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      throw new Error('未找到用户数据');
+    }
+    
+    const user = JSON.parse(userData);
+    const userId = user.id;
+    
+    if (!userId) {
+      throw new Error('未找到用户ID');
+    }
+    
+    // 使用测试接口验证积分
+    const response = await apiService.post('/api/credits/test/validate', {
+      user_id: userId
     });
     
-    if (!response.ok) {
-      throw new Error(`验证积分余额失败: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.message || '验证积分余额失败');
-    }
-    
     // 如果积分被修复，更新本地存储
-    if (data.data.was_repaired) {
-      updateLocalUserCredits(data.data.current_credits);
+    if (response.data.was_repaired) {
+      updateLocalUserCredits(response.data.current_credits);
     }
     
     return {
       success: true,
-      wasRepaired: data.data.was_repaired,
-      currentCredits: data.data.current_credits
+      wasRepaired: response.data.was_repaired,
+      currentCredits: response.data.current_credits
     };
   } catch (error) {
     console.error('验证积分余额失败:', error);
@@ -689,6 +702,110 @@ export const validateAllUserCredits = async (): Promise<{
     return {
       success: false,
       error: error instanceof Error ? error.message : '验证所有用户积分余额失败'
+    };
+  }
+};
+
+// 管理员手动调整积分
+export interface ManualCreditAdjustment {
+  user_id: string;
+  amount: number;
+  reason?: string;
+  expires_in?: number;
+}
+
+// 管理员手动增加积分
+export const addCreditsManual = async (adjustment: ManualCreditAdjustment): Promise<{
+  success: boolean;
+  transaction_id?: string;
+  amount?: number;
+  balance_after?: number;
+  expires_at?: string | null;
+  error?: string;
+}> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/add/manual`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        user_id: adjustment.user_id,
+        amount: adjustment.amount,
+        reason: adjustment.reason || '管理员手动调整',
+        expires_in: adjustment.expires_in
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`手动增加积分失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.message || '手动增加积分失败');
+    }
+    
+    return {
+      success: true,
+      transaction_id: data.data.transaction_id,
+      amount: data.data.amount,
+      balance_after: data.data.balance_after,
+      expires_at: data.data.expires_at
+    };
+  } catch (error) {
+    console.error('手动增加积分失败:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '手动增加积分失败'
+    };
+  }
+};
+
+// 管理员手动扣除积分
+export const deductCreditsManual = async (adjustment: ManualCreditAdjustment): Promise<{
+  success: boolean;
+  transaction_id?: string;
+  amount?: number;
+  balance_after?: number;
+  error?: string;
+}> => {
+  try {
+    // 确保金额为正数
+    const positiveAmount = Math.abs(adjustment.amount);
+    
+    const response = await fetch(`${API_BASE_URL}/deduct/manual`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        user_id: adjustment.user_id,
+        amount: positiveAmount,
+        reason: adjustment.reason || '管理员手动扣除'
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok || !data.success) {
+      // 处理积分不足的情况
+      if (response.status === 400 && data.error?.code === 'INSUFFICIENT_CREDITS') {
+        return {
+          success: false,
+          error: `用户积分不足，当前积分: ${data.error.details.available}, 需要扣除: ${data.error.details.required}`
+        };
+      }
+      
+      throw new Error(data.message || '手动扣除积分失败');
+    }
+    
+    return {
+      success: true,
+      amount: data.data.amount,
+      balance_after: data.data.balance_after
+    };
+  } catch (error) {
+    console.error('手动扣除积分失败:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '手动扣除积分失败'
     };
   }
 }; 
