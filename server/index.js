@@ -3,12 +3,17 @@ const path = require('path');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const fs = require('fs');
+const http = require('http');
+const { initWebSocketServer } = require('./websocket');
 
 // 加载环境变量
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 9000;
+
+// 创建HTTP服务器，用于同时支持Express和WebSocket
+const server = http.createServer(app);
 
 // 确保日志目录存在
 const logDir = path.join(__dirname, 'logs');
@@ -114,10 +119,14 @@ app.get('*', (req, res) => {
   res.sendFile(indexPath);
 });
 
-// 启动服务器
-app.listen(PORT, '0.0.0.0', () => {
+// 初始化WebSocket服务
+const wss = initWebSocketServer(server);
+
+// 启动HTTP服务器
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`服务器已启动，运行在端口 ${PORT}`);
   console.log(`网站可通过 http://localhost:${PORT} 访问`);
+  console.log(`WebSocket服务可通过 ws://localhost:${PORT} 访问`);
   console.log(`服务器监听在所有网络接口上 (0.0.0.0:${PORT})`);
   console.log(`管理员密码: ${process.env.ADMIN_PASSWORD || 'veoai-admin-2024'}`);
 }); 

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { sendUserBalance } = require('../websocket'); // 导入WebSocket推送函数
 
 // 引入Supabase客户端
 const { createClient } = require('@supabase/supabase-js');
@@ -150,6 +151,9 @@ router.post('/add/subscription', verifyAuth, async (req, res) => {
       expiresAt.setDate(expiresAt.getDate() + expires_in);
     }
     
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(user_id);
+    
     res.status(200).json({
       success: true,
       data: {
@@ -240,6 +244,9 @@ router.post('/add/purchase', verifyAuth, async (req, res) => {
       expiresAt.setDate(expiresAt.getDate() + expiresIn);
     }
     
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(user_id);
+    
     res.status(200).json({
       success: true,
       data: {
@@ -308,6 +315,9 @@ router.post('/add/manual', verifyAuth, verifyAdmin, async (req, res) => {
       expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expires_in);
     }
+    
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(user_id);
     
     res.status(200).json({
       success: true,
@@ -388,6 +398,9 @@ router.post('/consume', verifyAuth, async (req, res) => {
     
     const totalCredits = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
     
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(userId);
+    
     res.status(200).json({
       success: true,
       data: {
@@ -448,6 +461,9 @@ router.get('/transactions', verifyAuth, async (req, res) => {
         error: { code: 'INTERNAL_ERROR' } 
       });
     }
+    
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(userId);
     
     res.status(200).json({
       success: true,
@@ -517,6 +533,9 @@ router.post('/transactions', verifyAuth, verifyAdmin, async (req, res) => {
       });
     }
     
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(user_id);
+    
     res.status(200).json({
       success: true,
       data: {
@@ -578,6 +597,9 @@ router.get('/transactions/admin/:userId', verifyAuth, verifyAdmin, async (req, r
         error: { code: 'INTERNAL_ERROR' } 
       });
     }
+    
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(userId);
     
     res.status(200).json({
       success: true,
@@ -659,6 +681,11 @@ router.post('/batch-transactions', verifyAuth, verifyAdmin, async (req, res) => 
         message: '批量写入积分变动记录失败',
         error: { code: 'INTERNAL_ERROR' } 
       });
+    }
+    
+    // 通过WebSocket和SSE推送积分余额更新
+    for (const userId of userIds) {
+      notifyBalanceUpdate(userId);
     }
     
     res.status(200).json({
@@ -843,6 +870,9 @@ router.post('/consume/video', verifyAuth, async (req, res) => {
       }
     }
     
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(userId);
+    
     res.status(200).json({
       success: true,
       data: {
@@ -981,6 +1011,9 @@ router.post('/validate', verifyAuth, async (req, res) => {
     
     const totalCredits = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
     
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(userId);
+    
     res.status(200).json({
       success: true,
       data: {
@@ -1028,6 +1061,9 @@ router.post('/validate/admin/:userId', verifyAuth, verifyAdmin, async (req, res)
     }
     
     const totalCredits = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
+    
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(userId);
     
     res.status(200).json({
       success: true,
@@ -1104,6 +1140,11 @@ router.post('/validate-all', verifyAuth, verifyAdmin, async (req, res) => {
       }
     }
     
+    // 通过WebSocket和SSE推送积分余额更新
+    for (const userId of users.map(u => u.id)) {
+      notifyBalanceUpdate(userId);
+    }
+    
     res.status(200).json({
       success: true,
       data: results
@@ -1172,6 +1213,9 @@ router.post('/test/add', async (req, res) => {
     
     const totalCredits = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
     
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(user_id);
+    
     res.status(200).json({
       success: true,
       data: {
@@ -1230,6 +1274,9 @@ router.post('/test/validate', async (req, res) => {
     
     const totalCredits = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
     
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(user_id);
+    
     res.status(200).json({
       success: true,
       data: {
@@ -1275,6 +1322,9 @@ router.get('/test/balance', async (req, res) => {
       return res.status(500).json({ success: false, message: '获取积分失败' });
     }
 
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(user_id);
+    
     res.status(200).json({
       success: true,
       data: {
@@ -1381,6 +1431,9 @@ router.post('/deduct/manual', verifyAuth, verifyAdmin, async (req, res) => {
     
     const updatedTotalCredits = Array.isArray(updatedCredits) && updatedCredits.length ? updatedCredits[0].credits : 0;
     
+    // 通过WebSocket和SSE推送积分余额更新
+    notifyBalanceUpdate(user_id);
+    
     res.status(200).json({
       success: true,
       data: {
@@ -1395,6 +1448,180 @@ router.post('/deduct/manual', verifyAuth, verifyAdmin, async (req, res) => {
       message: '服务器内部错误',
       error: { code: 'INTERNAL_ERROR' } 
     });
+  }
+});
+
+// GET /api/credits/sse - SSE端点，用于积分余额实时推送
+router.get('/sse', verifyAuth, (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // 设置SSE相关的响应头
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    });
+    
+    // 发送初始连接成功消息
+    res.write(`data: ${JSON.stringify({ type: 'connected', message: '连接成功' })}\n\n`);
+    
+    // 立即发送当前积分余额
+    sendBalanceSSE(userId, res);
+    
+    // 每30秒发送一次ping，保持连接活跃
+    const pingInterval = setInterval(() => {
+      if (res.writableEnded) {
+        clearInterval(pingInterval);
+        return;
+      }
+      res.write(`data: ${JSON.stringify({ type: 'ping', timestamp: Date.now() })}\n\n`);
+    }, 30000);
+    
+    // 保存SSE连接到全局Map中，以便在积分变动时推送
+    if (!global.sseClients) {
+      global.sseClients = new Map();
+    }
+    
+    if (!global.sseClients.has(userId)) {
+      global.sseClients.set(userId, []);
+    }
+    
+    global.sseClients.get(userId).push(res);
+    console.log(`[SSE] 用户 ${userId} 已连接，当前SSE连接数: ${getSSEClientCount()}`);
+    
+    // 处理连接关闭
+    req.on('close', () => {
+      if (global.sseClients && global.sseClients.has(userId)) {
+        const connections = global.sseClients.get(userId);
+        const index = connections.indexOf(res);
+        
+        if (index !== -1) {
+          connections.splice(index, 1);
+        }
+        
+        if (connections.length === 0) {
+          global.sseClients.delete(userId);
+        }
+      }
+      
+      clearInterval(pingInterval);
+      console.log(`[SSE] 用户 ${userId} 已断开连接，当前SSE连接数: ${getSSEClientCount()}`);
+    });
+    
+  } catch (err) {
+    console.error('[SSE] 处理SSE连接错误:', err.message);
+    res.end();
+  }
+});
+
+// 获取SSE客户端数量
+function getSSEClientCount() {
+  if (!global.sseClients) {
+    return 0;
+  }
+  
+  let count = 0;
+  for (const connections of global.sseClients.values()) {
+    count += connections.length;
+  }
+  return count;
+}
+
+// 通过SSE发送积分余额
+async function sendBalanceSSE(userId, res = null) {
+  try {
+    // 如果没有指定res，则尝试从全局Map中获取
+    const connections = res ? [res] : (global.sseClients?.get(userId) || []);
+    
+    if (connections.length === 0) {
+      return;
+    }
+    
+    // 获取用户的积分余额
+    const { data: totalRows, error: totalErr } = await supabase.rpc('get_user_credits', { p_user_id: userId });
+    if (totalErr) {
+      console.error('[SSE] 获取用户积分失败:', totalErr);
+      return;
+    }
+    
+    const totalCredits = Array.isArray(totalRows) && totalRows.length ? totalRows[0].credits : 0;
+    
+    // 获取用户的积分明细
+    const { data: balances, error: balErr } = await supabase.rpc('get_user_credit_balances', { p_user_id: userId });
+    if (balErr) {
+      console.error('[SSE] 获取用户积分明细失败:', balErr);
+      return;
+    }
+    
+    // 构建消息
+    const message = {
+      type: 'balance_update',
+      timestamp: Date.now(),
+      data: {
+        total_credits: totalCredits,
+        balances: balances || []
+      }
+    };
+    
+    // 向所有连接发送消息
+    for (const connection of connections) {
+      if (!connection.writableEnded) {
+        connection.write(`data: ${JSON.stringify(message)}\n\n`);
+      }
+    }
+    
+    console.log(`[SSE] 已向用户 ${userId} 发送积分余额更新`);
+    
+  } catch (err) {
+    console.error('[SSE] 发送积分余额更新失败:', err.message);
+  }
+}
+
+// 修改现有的积分变动函数，同时支持WebSocket和SSE推送
+function notifyBalanceUpdate(userId) {
+  // WebSocket推送
+  sendUserBalance(userId);
+  
+  // SSE推送
+  if (global.sseClients && global.sseClients.has(userId)) {
+    sendBalanceSSE(userId);
+  }
+}
+
+// GET /api/credits/balance/poll - 轮询接口，用于获取最新积分余额
+router.get('/balance/poll', verifyAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // 调用存储过程获取总积分
+    const { data: totalRows, error: totalErr } = await supabase.rpc('get_user_credits', { p_user_id: userId });
+    if (totalErr) {
+      console.error('获取总积分失败:', totalErr);
+      return res.status(500).json({ success: false, message: '获取积分失败' });
+    }
+    const totalCredits = Array.isArray(totalRows) && totalRows.length ? totalRows[0].credits : 0;
+
+    // 调用存储过程获取有效积分明细
+    const { data: balances, error: balErr } = await supabase.rpc('get_user_credit_balances', { p_user_id: userId });
+    if (balErr) {
+      console.error('获取积分明细失败:', balErr);
+      return res.status(500).json({ success: false, message: '获取积分失败' });
+    }
+
+    // 添加轮询相关的元数据
+    res.status(200).json({
+      success: true,
+      data: {
+        total_credits: totalCredits,
+        balances: balances || [],
+        timestamp: Date.now(),
+        poll_interval: 10000 // 建议的轮询间隔，单位毫秒
+      }
+    });
+  } catch (err) {
+    console.error('轮询积分余额接口报错:', err);
+    res.status(500).json({ success: false, message: '服务器内部错误' });
   }
 });
 
