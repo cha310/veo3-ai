@@ -74,6 +74,67 @@ apiClient.interceptors.response.use(
 
 // API方法
 export const apiService = {
+  // 通用请求方法
+  get: async (url: string, params?: any, headers?: any) => {
+    try {
+      const response = await retryRequest({ 
+        method: 'get', 
+        url, 
+        params,
+        headers
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`GET请求失败: ${url}`, error);
+      throw error;
+    }
+  },
+  
+  post: async (url: string, data?: any, headers?: any) => {
+    try {
+      const response = await retryRequest({ 
+        method: 'post', 
+        url, 
+        data,
+        headers
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`POST请求失败: ${url}`, error);
+      throw error;
+    }
+  },
+  
+  put: async (url: string, data?: any, headers?: any) => {
+    try {
+      const response = await retryRequest({ 
+        method: 'put', 
+        url, 
+        data,
+        headers
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`PUT请求失败: ${url}`, error);
+      throw error;
+    }
+  },
+  
+  delete: async (url: string, params?: any, headers?: any) => {
+    try {
+      const response = await retryRequest({ 
+        method: 'delete', 
+        url, 
+        params,
+        headers
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`DELETE请求失败: ${url}`, error);
+      throw error;
+    }
+  },
+  
   // 健康检查
   checkHealth: async () => {
     try {

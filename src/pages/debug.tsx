@@ -2,120 +2,123 @@ import React, { useState, useEffect } from 'react';
 import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { simulateSubscriptionSuccess } from '../services/subscriptionService';
+import { fetchUserCredits, validateUserCredits } from '../services/creditService';
 
 const DebugPage: React.FC = () => {
   const session = useSession();
   const supabase = useSupabaseClient();
-  const [localStorageData, setLocalStorageData] = useState<any>(null);
-  const [cookieData, setCookieData] = useState<string>('');
   const [sessionData, setSessionData] = useState<any>(null);
+  const [localStorageData, setLocalStorageData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [userId, setUserId] = useState<string>('');
+  const [planId, setPlanId] = useState<'lite' | 'pro' | 'pro_plus'>('pro');
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [credits, setCredits] = useState<number | null>(null);
+  const [validationResult, setValidationResult] = useState<any>(null);
 
   // 获取本地存储数据
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        setLocalStorageData(JSON.parse(userData));
-      } catch (e) {
-        setLocalStorageData({ error: '无法解析本地存储数据' });
-      }
-    } else {
-      setLocalStorageData({ message: '本地存储中没有用户数据' });
-    }
-
-    // 获取Cookie
-    setCookieData(document.cookie);
-  }, [session]);
-
-  // 获取会话数据
-  useEffect(() => {
     const getSessionData = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          setSessionData({ error: error.message });
-        } else {
-          setSessionData(data);
-        }
-      } catch (err) {
-        setSessionData({ error: '获取会话时出错' });
-      }
+      // 显示会话信息
+      setSessionData(session);
+
+      // 显示本地存储数据
+      const userData = localStorage.getItem('user');
+      const tokenData = localStorage.getItem('supabaseToken');
+      setLocalStorageData({
+        user: userData ? JSON.parse(userData) : null,
+        token: tokenData
+      });
     };
 
     getSessionData();
   }, [session, supabase.auth]);
 
+  useEffect(() => {
+    // 获取当前用户ID
+    if (session?.user?.id) {
+      setUserId(session.user.id);
+    }
+    
+    // 获取用户积分
+    fetchUserCredits()
+      .then(data => setCredits(data.total))
+      .catch(err => console.error('获取积分失败:', err));
+  }, [session?.user?.id]);
+
   // 刷新会话
-  const handleRefreshSession = async () => {
+  const refreshSession = async () => {
     setLoading(true);
-    setMessage('正在刷新会话...');
+    setMessage('');
     try {
-      const { data, error } = await supabase.auth.refreshSession();
-      if (error) {
-        setMessage(`会话刷新失败: ${error.message}`);
-      } else {
-        setMessage('会话刷新成功');
-        setSessionData(data);
-      }
-    } catch (error) {
-      setMessage(`会话刷新异常: ${error}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 测试Google登录
-  const handleTestGoogleLogin = async () => {
-    setLoading(true);
-    setMessage('开始Google登录测试...');
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin + '/debug',
-        },
-      });
-      
-      if (error) {
-        setMessage(`登录错误: ${error.message}`);
-      } else {
-        setMessage('正在重定向到Google...');
-      }
-    } catch (error) {
-      setMessage(`登录异常: ${error}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 登出
-  const handleSignOut = async () => {
-    setLoading(true);
-    setMessage('正在登出...');
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        setMessage(`登出错误: ${error.message}`);
-      } else {
-        setMessage('登出成功');
-        // 刷新页面
-        window.location.reload();
-      }
-    } catch (error) {
-      setMessage(`登出异常: ${error}`);
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      setSessionData(data.session);
+      setMessage('会话已刷新');
+    } catch (error: any) {
+      setMessage(`刷新会话失败: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   // 清除本地存储
-  const handleClearLocalStorage = () => {
+  const clearLocalStorage = () => {
     localStorage.removeItem('user');
-    localStorage.removeItem('googleUserInfo');
-    setLocalStorageData({ message: '本地存储已清除' });
+    localStorage.removeItem('supabaseToken');
+    setLocalStorageData(null);
     setMessage('本地存储已清除');
+  };
+
+  const handleSimulateSubscription = async () => {
+    if (!userId) {
+      setError('请先输入用户ID');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const response = await simulateSubscriptionSuccess(userId, planId);
+      setResult(response);
+      
+      // 更新积分显示
+      const creditsData = await fetchUserCredits();
+      setCredits(creditsData.total);
+    } catch (err: any) {
+      setError(err.message || '模拟订阅失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleValidateCredits = async () => {
+    if (!userId) {
+      setError('请先输入用户ID');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setValidationResult(null);
+
+    try {
+      const response = await validateUserCredits();
+      setValidationResult(response);
+      
+      // 更新积分显示
+      const creditsData = await fetchUserCredits();
+      setCredits(creditsData.total);
+    } catch (err: any) {
+      setError(err.message || '验证积分失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -144,28 +147,14 @@ const DebugPage: React.FC = () => {
               <h2 className="text-xl font-bold mb-4">操作</h2>
               <div className="flex flex-col space-y-3">
                 <button 
-                  onClick={handleRefreshSession}
+                  onClick={refreshSession}
                   disabled={loading}
                   className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md disabled:opacity-50"
                 >
                   刷新会话
                 </button>
                 <button 
-                  onClick={handleTestGoogleLogin}
-                  disabled={loading}
-                  className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-md disabled:opacity-50"
-                >
-                  测试Google登录
-                </button>
-                <button 
-                  onClick={handleSignOut}
-                  disabled={loading || !session}
-                  className="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-md disabled:opacity-50"
-                >
-                  登出
-                </button>
-                <button 
-                  onClick={handleClearLocalStorage}
+                  onClick={clearLocalStorage}
                   className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-md"
                 >
                   清除本地存储
@@ -183,19 +172,82 @@ const DebugPage: React.FC = () => {
             </div>
             
             <div className="bg-[#1a1e27] p-6 rounded-lg">
-              <h2 className="text-xl font-bold mb-4">Cookie 数据</h2>
-              <pre className="bg-[#0d1117] p-4 rounded-md overflow-auto max-h-48">
-                {cookieData || '无Cookie数据'}
-              </pre>
-            </div>
-            
-            <div className="bg-[#1a1e27] p-6 rounded-lg">
               <h2 className="text-xl font-bold mb-4">会话数据</h2>
               <pre className="bg-[#0d1117] p-4 rounded-md overflow-auto max-h-96">
                 {JSON.stringify(sessionData, null, 2)}
               </pre>
             </div>
           </div>
+
+          <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">当前积分: {credits !== null ? credits : '加载中...'}</h2>
+            
+            <div className="mb-4">
+              <label className="block text-gray-700 mb-2">用户ID:</label>
+              <input
+                type="text"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+                className="w-full border rounded px-3 py-2"
+                placeholder="输入用户ID"
+              />
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-gray-700 mb-2">订阅计划:</label>
+              <select
+                value={planId}
+                onChange={(e) => setPlanId(e.target.value as 'lite' | 'pro' | 'pro_plus')}
+                className="w-full border rounded px-3 py-2"
+              >
+                <option value="lite">Lite (600积分)</option>
+                <option value="pro">Pro (1200积分)</option>
+                <option value="pro_plus">Pro+ (2500积分)</option>
+              </select>
+            </div>
+            
+            <div className="flex space-x-4">
+              <button
+                onClick={handleSimulateSubscription}
+                disabled={loading}
+                className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded disabled:opacity-50"
+              >
+                {loading ? '处理中...' : '模拟订阅成功'}
+              </button>
+              
+              <button
+                onClick={handleValidateCredits}
+                disabled={loading}
+                className="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded disabled:opacity-50"
+              >
+                {loading ? '处理中...' : '验证积分余额'}
+              </button>
+            </div>
+            
+            {error && (
+              <div className="mt-4 p-3 bg-red-100 text-red-700 rounded">
+                错误: {error}
+              </div>
+            )}
+          </div>
+          
+          {result && (
+            <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+              <h2 className="text-xl font-semibold mb-2">订阅结果:</h2>
+              <pre className="bg-gray-100 p-3 rounded overflow-auto max-h-60">
+                {JSON.stringify(result, null, 2)}
+              </pre>
+            </div>
+          )}
+          
+          {validationResult && (
+            <div className="bg-white shadow-md rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-2">验证结果:</h2>
+              <pre className="bg-gray-100 p-3 rounded overflow-auto max-h-60">
+                {JSON.stringify(validationResult, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       </div>
       <Footer />
