@@ -678,4 +678,276 @@ router.post('/batch-transactions', verifyAuth, verifyAdmin, async (req, res) => 
   }
 });
 
+// POST /api/credits/consume/video - 视频生成时扣除积分
+router.post('/consume/video', verifyAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { model_id, video_id, duration, resolution, additional_features } = req.body;
+    
+    if (!model_id) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '缺少必要参数: model_id',
+        error: { code: 'INVALID_PARAMETERS' } 
+      });
+    }
+    
+    // 获取模型对应的积分消耗
+    let amount;
+    let modelDescription;
+    
+    switch (model_id) {
+      case 'kling-1.6':
+        amount = 20;
+        modelDescription = 'Kling 1.6';
+        break;
+      case 'veo-2':
+        amount = 180;
+        modelDescription = 'Veo 2';
+        break;
+      case 'veo-3':
+        amount = 330;
+        modelDescription = 'Veo 3';
+        break;
+      default:
+        return res.status(400).json({ 
+          success: false, 
+          message: '不支持的模型ID',
+          error: { code: 'INVALID_PARAMETERS' } 
+        });
+    }
+    
+    // 计算额外功能的积分消耗
+    if (additional_features && Array.isArray(additional_features)) {
+      for (const feature of additional_features) {
+        switch (feature) {
+          case 'hd':
+            amount += 50; // 高清画质额外消耗50积分
+            break;
+          case 'longer_duration':
+            amount += 100; // 更长时长额外消耗100积分
+            break;
+          case 'enhanced_quality':
+            amount += 80; // 增强质量额外消耗80积分
+            break;
+        }
+      }
+    }
+    
+    // 构建消费描述
+    let description = `生成${modelDescription}视频`;
+    if (duration) {
+      description += `，时长${duration}秒`;
+    }
+    if (resolution) {
+      description += `，分辨率${resolution}`;
+    }
+    
+    // 检查用户积分是否足够
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id: userId });
+    
+    if (creditsError) {
+      console.error('获取用户积分失败:', creditsError);
+      return res.status(500).json({ 
+        success: false, 
+        message: '获取用户积分失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    const currentCredits = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
+    
+    if (currentCredits < amount) {
+      return res.status(400).json({
+        success: false,
+        message: '积分不足',
+        error: {
+          code: 'INSUFFICIENT_CREDITS',
+          details: {
+            required: amount,
+            available: currentCredits
+          }
+        }
+      });
+    }
+    
+    // 构建元数据
+    const metadata = {
+      model_id,
+      video_id: video_id || null,
+      duration: duration || null,
+      resolution: resolution || null,
+      additional_features: additional_features || []
+    };
+    
+    // 调用存储过程消费积分
+    const { data, error } = await supabase.rpc('consume_credits', {
+      p_user_id: userId,
+      p_amount: amount,
+      p_type: 'video_generation',
+      p_source: model_id,
+      p_description: description
+    });
+    
+    if (error) {
+      console.error('视频生成扣除积分失败:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: '扣除积分失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    // 如果返回false，表示积分不足（虽然前面已经检查过，这里是双重保险）
+    if (data === false) {
+      return res.status(400).json({
+        success: false,
+        message: '积分不足',
+        error: {
+          code: 'INSUFFICIENT_CREDITS',
+          details: {
+            required: amount,
+            available: currentCredits
+          }
+        }
+      });
+    }
+    
+    // 获取最新的积分余额
+    const { data: updatedCredits, error: updatedError } = await supabase.rpc('get_user_credits', { user_id: userId });
+    
+    if (updatedError) {
+      console.error('获取更新后的用户积分失败:', updatedError);
+    }
+    
+    const updatedTotalCredits = Array.isArray(updatedCredits) && updatedCredits.length ? updatedCredits[0].credits : 0;
+    
+    // 更新交易记录的元数据
+    if (data) {
+      // 查询最近的交易记录ID
+      const { data: latestTransaction, error: txError } = await supabase
+        .from('credit_transactions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('type', 'video_generation')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (!txError && latestTransaction) {
+        // 更新元数据
+        await supabase
+          .from('credit_transactions')
+          .update({ metadata })
+          .eq('id', latestTransaction.id);
+      }
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        transaction_id: data || 'unknown',
+        amount,
+        balance_after: updatedTotalCredits,
+        model_id,
+        features: additional_features || []
+      }
+    });
+  } catch (err) {
+    console.error('视频生成扣除积分接口报错:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: '服务器内部错误',
+      error: { code: 'INTERNAL_ERROR' } 
+    });
+  }
+});
+
+// POST /api/credits/check/video - 检查视频生成所需积分
+router.post('/check/video', verifyAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { model_id, additional_features } = req.body;
+    
+    if (!model_id) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '缺少必要参数: model_id',
+        error: { code: 'INVALID_PARAMETERS' } 
+      });
+    }
+    
+    // 获取模型对应的积分消耗
+    let amount;
+    
+    switch (model_id) {
+      case 'kling-1.6':
+        amount = 20;
+        break;
+      case 'veo-2':
+        amount = 180;
+        break;
+      case 'veo-3':
+        amount = 330;
+        break;
+      default:
+        return res.status(400).json({ 
+          success: false, 
+          message: '不支持的模型ID',
+          error: { code: 'INVALID_PARAMETERS' } 
+        });
+    }
+    
+    // 计算额外功能的积分消耗
+    if (additional_features && Array.isArray(additional_features)) {
+      for (const feature of additional_features) {
+        switch (feature) {
+          case 'hd':
+            amount += 50; // 高清画质额外消耗50积分
+            break;
+          case 'longer_duration':
+            amount += 100; // 更长时长额外消耗100积分
+            break;
+          case 'enhanced_quality':
+            amount += 80; // 增强质量额外消耗80积分
+            break;
+        }
+      }
+    }
+    
+    // 获取用户当前积分余额
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id: userId });
+    
+    if (creditsError) {
+      console.error('获取用户积分失败:', creditsError);
+      return res.status(500).json({ 
+        success: false, 
+        message: '获取用户积分失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    const currentCredits = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        has_enough_credits: currentCredits >= amount,
+        required_credits: amount,
+        current_credits: currentCredits,
+        credits_after: currentCredits - amount,
+        model_id,
+        features: additional_features || []
+      }
+    });
+  } catch (err) {
+    console.error('检查视频生成积分接口报错:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: '服务器内部错误',
+      error: { code: 'INTERNAL_ERROR' } 
+    });
+  }
+});
+
 module.exports = router; 

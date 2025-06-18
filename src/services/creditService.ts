@@ -368,4 +368,161 @@ export const fetchUserTransactions = async (userId: string, params: TransactionQ
     console.error('获取用户积分交易记录失败:', error);
     return { total: 0, transactions: [] };
   }
+};
+
+// 视频生成相关的接口
+export interface VideoGenerationOptions {
+  model_id: string;
+  video_id?: string;
+  duration?: number;
+  resolution?: string;
+  additional_features?: string[];
+}
+
+// 视频生成结果
+export interface VideoGenerationResult {
+  success: boolean;
+  transaction_id?: string;
+  amount?: number;
+  balance_after?: number;
+  error?: {
+    code: string;
+    message: string;
+    details?: {
+      required: number;
+      available: number;
+    };
+  };
+}
+
+// 检查视频生成所需积分
+export const checkVideoGenerationCredits = async (options: VideoGenerationOptions): Promise<{
+  hasEnough: boolean;
+  required: number;
+  current: number;
+  after: number;
+  model_id: string;
+  features: string[];
+}> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/check/video`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(options)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`检查视频生成积分失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.message || '检查视频生成积分失败');
+    }
+    
+    return {
+      hasEnough: data.data.has_enough_credits,
+      required: data.data.required_credits,
+      current: data.data.current_credits,
+      after: data.data.credits_after,
+      model_id: data.data.model_id,
+      features: data.data.features
+    };
+  } catch (error) {
+    console.error('检查视频生成积分失败:', error);
+    
+    // 回退到本地检查
+    const currentCredits = getUserCredits();
+    let requiredCredits = getModelCreditCost(options.model_id);
+    
+    // 计算额外功能的积分消耗
+    if (options.additional_features && Array.isArray(options.additional_features)) {
+      for (const feature of options.additional_features) {
+        switch (feature) {
+          case 'hd':
+            requiredCredits += 50;
+            break;
+          case 'longer_duration':
+            requiredCredits += 100;
+            break;
+          case 'enhanced_quality':
+            requiredCredits += 80;
+            break;
+        }
+      }
+    }
+    
+    return {
+      hasEnough: currentCredits >= requiredCredits,
+      required: requiredCredits,
+      current: currentCredits,
+      after: currentCredits - requiredCredits,
+      model_id: options.model_id,
+      features: options.additional_features || []
+    };
+  }
+};
+
+// 视频生成时扣除积分
+export const consumeVideoGenerationCredits = async (options: VideoGenerationOptions): Promise<VideoGenerationResult> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/consume/video`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(options)
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok || !data.success) {
+      // 处理积分不足的情况
+      if (response.status === 400 && data.error?.code === 'INSUFFICIENT_CREDITS') {
+        return {
+          success: false,
+          error: {
+            code: 'INSUFFICIENT_CREDITS',
+            message: '积分不足',
+            details: data.error.details
+          }
+        };
+      }
+      
+      throw new Error(data.message || '视频生成扣除积分失败');
+    }
+    
+    // 更新本地存储的积分
+    updateLocalUserCredits(data.data.balance_after);
+    
+    return {
+      success: true,
+      transaction_id: data.data.transaction_id,
+      amount: data.data.amount,
+      balance_after: data.data.balance_after
+    };
+  } catch (error) {
+    console.error('视频生成扣除积分失败:', error);
+    
+    // 尝试本地消费（仅在开发环境或紧急情况下使用）
+    if (process.env.NODE_ENV === 'development') {
+      const currentCredits = getUserCredits();
+      const cost = getModelCreditCost(options.model_id);
+      
+      if (currentCredits >= cost) {
+        updateUserCredits(currentCredits - cost);
+        return {
+          success: true,
+          amount: cost,
+          balance_after: currentCredits - cost
+        };
+      }
+    }
+    
+    return { 
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: '视频生成扣除积分失败'
+      }
+    };
+  }
 }; 
