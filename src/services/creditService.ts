@@ -259,4 +259,113 @@ export const checkCredits = async (amount: number, model?: string): Promise<{ ha
       after: currentCredits - requiredCredits
     };
   }
+};
+
+// 直接写入积分变动记录（仅管理员）
+export interface CreditTransactionRecord {
+  user_id: string;
+  amount: number;
+  type: string;
+  source?: string;
+  description?: string;
+  metadata?: Record<string, any>;
+}
+
+// 写入单条积分变动记录
+export const writeTransactionRecord = async (transaction: CreditTransactionRecord): Promise<{ success: boolean, transaction_id?: string }> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/transactions`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(transaction)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`写入积分变动记录失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.message || '写入积分变动记录失败');
+    }
+    
+    return {
+      success: true,
+      transaction_id: data.data.transaction_id
+    };
+  } catch (error) {
+    console.error('写入积分变动记录失败:', error);
+    return { success: false };
+  }
+};
+
+// 批量写入积分变动记录
+export const writeBatchTransactionRecords = async (transactions: CreditTransactionRecord[]): Promise<{ success: boolean, inserted_count?: number }> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/batch-transactions`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ transactions })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`批量写入积分变动记录失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.message || '批量写入积分变动记录失败');
+    }
+    
+    return {
+      success: true,
+      inserted_count: data.data.inserted_count
+    };
+  } catch (error) {
+    console.error('批量写入积分变动记录失败:', error);
+    return { success: false };
+  }
+};
+
+// 管理员获取指定用户的积分交易记录
+export const fetchUserTransactions = async (userId: string, params: TransactionQueryParams = {}): Promise<{ total: number, transactions: CreditTransaction[] }> => {
+  try {
+    const { limit = 20, offset = 0, type = 'all', startDate, endDate } = params;
+    
+    // 构建查询参数
+    const queryParams = new URLSearchParams();
+    queryParams.append('limit', limit.toString());
+    queryParams.append('offset', offset.toString());
+    queryParams.append('type', type);
+    
+    if (startDate) {
+      queryParams.append('start_date', startDate);
+    }
+    
+    if (endDate) {
+      queryParams.append('end_date', endDate);
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/transactions/admin/${userId}?${queryParams.toString()}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error(`获取用户交易记录失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.message || '获取用户交易记录失败');
+    }
+    
+    return {
+      total: data.data.total,
+      transactions: data.data.transactions
+    };
+  } catch (error) {
+    console.error('获取用户积分交易记录失败:', error);
+    return { total: 0, transactions: [] };
+  }
 }; 

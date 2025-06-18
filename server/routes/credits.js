@@ -466,4 +466,216 @@ router.get('/transactions', verifyAuth, async (req, res) => {
   }
 });
 
+// POST /api/credits/transactions - 直接写入积分变动记录（不改变用户实际积分）
+router.post('/transactions', verifyAuth, verifyAdmin, async (req, res) => {
+  try {
+    const { user_id, amount, type, source, description, metadata } = req.body;
+    
+    if (!user_id || amount === undefined || !type) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '缺少必要参数',
+        error: { code: 'INVALID_PARAMETERS' } 
+      });
+    }
+    
+    // 获取用户当前积分余额
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id });
+    
+    if (creditsError) {
+      console.error('获取用户积分失败:', creditsError);
+      return res.status(500).json({ 
+        success: false, 
+        message: '获取用户积分失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    const currentCredits = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
+    
+    // 直接写入交易记录，不改变用户实际积分
+    const { data, error } = await supabase
+      .from('credit_transactions')
+      .insert({
+        user_id,
+        amount,
+        balance_after: currentCredits, // 使用当前余额，不实际改变用户积分
+        type,
+        source,
+        description,
+        metadata: metadata || null
+      })
+      .select('id')
+      .single();
+    
+    if (error) {
+      console.error('写入积分变动记录失败:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: '写入积分变动记录失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        transaction_id: data.id,
+        amount,
+        balance_after: currentCredits
+      }
+    });
+  } catch (err) {
+    console.error('写入积分变动记录接口报错:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: '服务器内部错误',
+      error: { code: 'INTERNAL_ERROR' } 
+    });
+  }
+});
+
+// GET /api/credits/transactions/admin/:userId - 管理员获取指定用户的积分交易记录
+router.get('/transactions/admin/:userId', verifyAuth, verifyAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { limit = 20, offset = 0, type = 'all', start_date, end_date } = req.query;
+    
+    // 构建查询
+    let query = supabase
+      .from('credit_transactions')
+      .select('*', { count: 'exact' })
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    // 应用过滤条件
+    if (type && type !== 'all') {
+      query = query.eq('type', type);
+    }
+    
+    if (start_date) {
+      query = query.gte('created_at', start_date);
+    }
+    
+    if (end_date) {
+      // 添加一天，使得结束日期是包含的
+      const endDateObj = new Date(end_date);
+      endDateObj.setDate(endDateObj.getDate() + 1);
+      query = query.lt('created_at', endDateObj.toISOString());
+    }
+    
+    // 应用分页
+    query = query.range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+    
+    // 执行查询
+    const { data, error, count } = await query;
+    
+    if (error) {
+      console.error('管理员获取用户积分交易记录失败:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: '获取交易记录失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        total: count || 0,
+        transactions: data || []
+      }
+    });
+  } catch (err) {
+    console.error('管理员获取用户积分交易记录接口报错:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: '服务器内部错误',
+      error: { code: 'INTERNAL_ERROR' } 
+    });
+  }
+});
+
+// POST /api/credits/batch-transactions - 批量写入积分变动记录
+router.post('/batch-transactions', verifyAuth, verifyAdmin, async (req, res) => {
+  try {
+    const { transactions } = req.body;
+    
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '缺少有效的交易记录数组',
+        error: { code: 'INVALID_PARAMETERS' } 
+      });
+    }
+    
+    // 验证每条记录的必要字段
+    for (const transaction of transactions) {
+      if (!transaction.user_id || transaction.amount === undefined || !transaction.type) {
+        return res.status(400).json({ 
+          success: false, 
+          message: '交易记录缺少必要参数',
+          error: { code: 'INVALID_PARAMETERS' } 
+        });
+      }
+    }
+    
+    // 获取每个用户的当前积分余额
+    const userIds = [...new Set(transactions.map(t => t.user_id))];
+    const userCreditsMap = {};
+    
+    for (const userId of userIds) {
+      const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id: userId });
+      
+      if (creditsError) {
+        console.error(`获取用户 ${userId} 积分失败:`, creditsError);
+        continue;
+      }
+      
+      userCreditsMap[userId] = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
+    }
+    
+    // 准备插入数据
+    const recordsToInsert = transactions.map(t => ({
+      user_id: t.user_id,
+      amount: t.amount,
+      balance_after: userCreditsMap[t.user_id] || 0, // 使用查询到的当前余额
+      type: t.type,
+      source: t.source || null,
+      description: t.description || null,
+      metadata: t.metadata || null
+    }));
+    
+    // 批量插入交易记录
+    const { data, error } = await supabase
+      .from('credit_transactions')
+      .insert(recordsToInsert)
+      .select('id');
+    
+    if (error) {
+      console.error('批量写入积分变动记录失败:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: '批量写入积分变动记录失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        inserted_count: data.length,
+        transaction_ids: data.map(item => item.id)
+      }
+    });
+  } catch (err) {
+    console.error('批量写入积分变动记录接口报错:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: '服务器内部错误',
+      error: { code: 'INTERNAL_ERROR' } 
+    });
+  }
+});
+
 module.exports = router; 
