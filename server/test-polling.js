@@ -1,9 +1,9 @@
 /**
- * 轮询接口测试脚本
+ * 轮询客户端测试脚本
+ * 用于测试积分余额轮询接口
  * 
  * 使用方法：
- * 1. 确保服务器已启动
- * 2. 运行 node test-polling.js <JWT令牌>
+ * node test-polling.js <token>
  */
 
 const fetch = require('node-fetch');
@@ -14,92 +14,81 @@ dotenv.config();
 
 // 获取命令行参数
 const token = process.argv[2];
-
 if (!token) {
-  console.error('错误: 缺少JWT令牌参数');
-  console.error('用法: node test-polling.js <JWT令牌>');
+  console.error('请提供JWT令牌');
+  console.error('用法: node test-polling.js <token>');
   process.exit(1);
 }
 
-// 服务器地址
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:9000';
-const POLL_URL = `${SERVER_URL}/api/credits/balance/poll`;
+// API服务器URL
+const API_URL = process.env.API_URL || 'http://localhost:3000';
+const POLL_URL = `${API_URL}/api/credits/balance/poll`;
 
-console.log('开始轮询积分余额...');
-console.log(`URL: ${POLL_URL}`);
-console.log(`Token: ${token.substring(0, 10)}...`);
+console.log(`将轮询积分余额接口: ${POLL_URL}`);
 
-// 轮询函数
-async function pollBalance() {
-  try {
-    const response = await fetch(POLL_URL, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (!response.ok) {
-      console.error(`请求失败: ${response.status} ${response.statusText}`);
-      const text = await response.text();
-      console.error(`响应内容: ${text}`);
-      return null;
-    }
-    
-    const data = await response.json();
-    return data;
-  } catch (err) {
-    console.error('轮询请求出错:', err);
-    return null;
-  }
-}
+// 轮询间隔（毫秒）
+let pollInterval = 10000; // 默认10秒
+let isPolling = true;
 
 // 开始轮询
-let lastTotal = null;
-let pollInterval = 10000; // 默认10秒
-
 async function startPolling() {
   console.log('开始轮询...');
   
-  while (true) {
-    const result = await pollBalance();
-    
-    if (result && result.success) {
-      const { total_credits, timestamp, poll_interval } = result.data;
+  while (isPolling) {
+    try {
+      // 发送请求
+      const response = await fetch(POLL_URL, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
-      // 更新轮询间隔
-      if (poll_interval) {
-        pollInterval = poll_interval;
+      if (!response.ok) {
+        console.error(`轮询失败: ${response.status} ${response.statusText}`);
+        const text = await response.text();
+        console.error(`响应内容: ${text}`);
+        await sleep(pollInterval);
+        continue;
       }
       
-      // 检查积分是否变化
-      if (lastTotal !== null && lastTotal !== total_credits) {
-        console.log(`[${new Date().toISOString()}] 积分已变化: ${lastTotal} -> ${total_credits}`);
+      // 解析响应
+      const data = await response.json();
+      
+      // 更新轮询间隔（如果服务器提供）
+      if (data.poll_interval) {
+        pollInterval = data.poll_interval;
       }
       
-      console.log(`[${new Date().toISOString()}] 当前积分: ${total_credits}`);
-      console.log(`服务器时间戳: ${new Date(timestamp).toISOString()}`);
-      console.log(`建议轮询间隔: ${pollInterval}ms`);
+      // 显示积分余额
+      console.log(`[${new Date().toLocaleString()}] 轮询结果:`);
+      console.log(`- 总积分: ${data.total_credits}`);
+      console.log('- 积分明细:');
+      data.balances.forEach(balance => {
+        console.log(`  * ${balance.credit_type}: ${balance.amount} (过期时间: ${new Date(balance.expiry_date).toLocaleString()})`);
+      });
+      console.log(`- 下次轮询间隔: ${pollInterval}ms`);
       console.log('-----------------------------------');
       
-      // 更新上次的积分
-      lastTotal = total_credits;
-    } else {
-      console.log(`[${new Date().toISOString()}] 轮询失败`);
+    } catch (err) {
+      console.error('轮询出错:', err.message);
     }
     
-    // 等待下一次轮询
-    await new Promise(resolve => setTimeout(resolve, pollInterval));
+    // 等待指定时间后再次轮询
+    await sleep(pollInterval);
   }
 }
 
-// 启动轮询
-startPolling().catch(err => {
-  console.error('轮询过程出错:', err);
-  process.exit(1);
+// 睡眠函数
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// 处理进程退出
+process.on('SIGINT', () => {
+  console.log('正在停止轮询...');
+  isPolling = false;
+  process.exit(0);
 });
 
-// 捕获Ctrl+C，优雅地退出
-process.on('SIGINT', () => {
-  console.log('停止轮询，正在退出...');
-  process.exit(0);
-}); 
+// 启动轮询
+startPolling(); 

@@ -1,383 +1,400 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { fetchUserCredits, CreditBalance } from '../services/creditService';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useAuth } from '../hooks/useAuth';
 
-// 连接状态枚举
-enum ConnectionState {
-  CONNECTING = 'connecting',
-  CONNECTED = 'connected',
-  DISCONNECTED = 'disconnected',
-  RECONNECTING = 'reconnecting',
+// 定义积分余额类型
+export interface CreditBalance {
+  credit_type: string;
+  amount: number;
+  expiry_date: string;
 }
 
-// 连接类型枚举
-enum ConnectionType {
-  WEBSOCKET = 'websocket',
-  SSE = 'sse',
-  POLLING = 'polling',
-  NONE = 'none',
-}
+// 定义连接状态类型
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
-// 上下文接口
+// 定义连接类型
+export type ConnectionType = 'websocket' | 'sse' | 'polling' | 'none';
+
+// 定义上下文类型
 interface CreditContextType {
   totalCredits: number;
   balances: CreditBalance[];
-  isLoading: boolean;
-  error: string | null;
-  connectionState: ConnectionState;
+  connectionStatus: ConnectionStatus;
   connectionType: ConnectionType;
-  refreshCredits: () => Promise<void>;
+  lastUpdated: Date | null;
+  reconnect: () => void;
+  disconnect: () => void;
 }
 
 // 创建上下文
 const CreditContext = createContext<CreditContextType>({
   totalCredits: 0,
   balances: [],
-  isLoading: false,
-  error: null,
-  connectionState: ConnectionState.DISCONNECTED,
-  connectionType: ConnectionType.NONE,
-  refreshCredits: async () => {},
+  connectionStatus: 'disconnected',
+  connectionType: 'none',
+  lastUpdated: null,
+  reconnect: () => {},
+  disconnect: () => {}
 });
 
-// 提供者组件
-export const CreditProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// 提供器属性类型
+interface CreditProviderProps {
+  children: React.ReactNode;
+}
+
+// 定义WebSocket重连配置
+const WS_RECONNECT_DELAY = 2000; // 2秒
+const WS_MAX_RECONNECT_ATTEMPTS = 5;
+
+// 定义SSE重连配置
+const SSE_RECONNECT_DELAY = 3000; // 3秒
+const SSE_MAX_RECONNECT_ATTEMPTS = 3;
+
+// 定义轮询配置
+const POLLING_INTERVAL = 10000; // 10秒
+
+// 扩展EventSource初始化选项类型，添加headers属性
+interface ExtendedEventSourceInit extends EventSourceInit {
+  headers?: Record<string, string>;
+}
+
+export const CreditProvider: React.FC<CreditProviderProps> = ({ children }) => {
+  // 获取认证信息
+  const { user, token } = useAuth();
+  
   // 状态
   const [totalCredits, setTotalCredits] = useState<number>(0);
   const [balances, setBalances] = useState<CreditBalance[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED);
-  const [connectionType, setConnectionType] = useState<ConnectionType>(ConnectionType.NONE);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
+  const [connectionType, setConnectionType] = useState<ConnectionType>('none');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // 引用
   const wsRef = useRef<WebSocket | null>(null);
-  const sseRef = useRef<EventSource | null>(null);
-  const pollingIntervalRef = useRef<number | null>(null);
-  const reconnectTimeoutRef = useRef<number | null>(null);
-  const reconnectAttemptsRef = useRef<number>(0);
-  const maxReconnectAttempts = 5;
-  const baseReconnectDelay = 1000; // 1秒
-  
-  // 获取JWT令牌
-  const getToken = useCallback((): string | null => {
-    return localStorage.getItem('supabaseToken');
-  }, []);
-  
-  // 刷新积分余额
-  const refreshCredits = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const { total, balances } = await fetchUserCredits();
-      
-      setTotalCredits(total);
-      setBalances(balances);
-    } catch (err) {
-      console.error('刷新积分余额失败:', err);
-      setError('获取积分余额失败');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-  
-  // 处理积分余额更新
-  const handleBalanceUpdate = useCallback((data: any) => {
-    // 只有当积分余额发生变化时才更新状态
-    if (data.total_credits !== totalCredits || JSON.stringify(data.balances) !== JSON.stringify(balances)) {
-      console.log('积分余额已更新:', data);
-      setTotalCredits(data.total_credits);
-      setBalances(data.balances || []);
-      
-      // 更新本地存储中的积分
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        try {
-          const user = JSON.parse(userData);
-          user.credits = data.total_credits;
-          localStorage.setItem('user', JSON.stringify(user));
-        } catch (err) {
-          console.error('更新本地存储中的积分失败:', err);
-        }
-      }
-    }
-  }, [totalCredits, balances]);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const wsReconnectAttemptsRef = useRef<number>(0);
+  const sseReconnectAttemptsRef = useRef<number>(0);
+  const isConnectingRef = useRef<boolean>(false);
+  const lastBalanceUpdateRef = useRef<string>(''); // 用于防止重复更新
   
   // 清理所有连接
   const cleanupConnections = useCallback(() => {
-    // 清理WebSocket连接
+    // 清理WebSocket
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
     
-    // 清理SSE连接
-    if (sseRef.current) {
-      sseRef.current.close();
-      sseRef.current = null;
+    // 清理SSE
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
     
-    // 清理轮询定时器
+    // 清理轮询
     if (pollingIntervalRef.current) {
-      window.clearInterval(pollingIntervalRef.current);
+      clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
     
-    // 清理重连定时器
-    if (reconnectTimeoutRef.current) {
-      window.clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
+    // 重置连接状态
+    wsReconnectAttemptsRef.current = 0;
+    sseReconnectAttemptsRef.current = 0;
+    isConnectingRef.current = false;
   }, []);
   
-  // 计算重连延迟（指数退避）
-  const getReconnectDelay = useCallback(() => {
-    const attempt = reconnectAttemptsRef.current;
-    // 指数退避，但最多等待30秒
-    return Math.min(baseReconnectDelay * Math.pow(2, attempt), 30000);
+  // 断开连接
+  const disconnect = useCallback(() => {
+    cleanupConnections();
+    setConnectionStatus('disconnected');
+    setConnectionType('none');
+  }, [cleanupConnections]);
+  
+  // 处理余额更新
+  const handleBalanceUpdate = useCallback((data: any) => {
+    // 防止重复更新
+    const updateKey = JSON.stringify(data);
+    if (updateKey === lastBalanceUpdateRef.current) {
+      return;
+    }
+    
+    lastBalanceUpdateRef.current = updateKey;
+    
+    // 更新状态
+    setTotalCredits(data.total_credits);
+    setBalances(data.balances || []);
+    setLastUpdated(new Date());
+    
+    // 记录日志
+    console.log('[CreditContext] 余额已更新:', data);
   }, []);
-  
-  // 启动轮询
-  const startPolling = useCallback(() => {
-    setConnectionState(ConnectionState.CONNECTED);
-    setConnectionType(ConnectionType.POLLING);
-    
-    // 立即执行一次轮询
-    refreshCredits();
-    
-    // 设置定时器，每10秒轮询一次
-    pollingIntervalRef.current = window.setInterval(() => {
-      refreshCredits();
-    }, 10000);
-    
-    return true;
-  }, [refreshCredits]);
-  
-  // 连接SSE
-  const connectSSE = useCallback(() => {
-    const token = getToken();
-    if (!token) {
-      console.error('SSE连接失败: 未找到令牌');
-      return false;
-    }
-    
-    try {
-      setConnectionState(ConnectionState.CONNECTING);
-      setConnectionType(ConnectionType.SSE);
-      
-      // 创建SSE连接，通过URL参数传递令牌
-      const eventSource = new EventSource(`/api/credits/sse?token=${encodeURIComponent(token)}`, {
-        withCredentials: true
-      });
-      sseRef.current = eventSource;
-      
-      // 连接打开时
-      eventSource.onopen = () => {
-        console.log('SSE连接已建立');
-        setConnectionState(ConnectionState.CONNECTED);
-        reconnectAttemptsRef.current = 0; // 重置重连计数
-      };
-      
-      // 接收消息时
-      eventSource.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          
-          if (message.type === 'balance_update' && message.data) {
-            handleBalanceUpdate(message.data);
-          } else if (message.type === 'error') {
-            console.error('SSE错误:', message.message);
-          }
-        } catch (err) {
-          console.error('解析SSE消息失败:', err);
-        }
-      };
-      
-      // 连接错误时
-      eventSource.onerror = () => {
-        console.error('SSE连接错误');
-        eventSource.close();
-        setConnectionState(ConnectionState.DISCONNECTED);
-        
-        // 尝试重连
-        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-          reconnectAttemptsRef.current++;
-          const delay = getReconnectDelay();
-          
-          console.log(`将在${delay}毫秒后尝试重新连接(SSE)...`);
-          setConnectionState(ConnectionState.RECONNECTING);
-          
-          reconnectTimeoutRef.current = window.setTimeout(() => {
-            // 尝试重新连接SSE，如果失败则降级到轮询
-            if (!connectSSE()) {
-              startPolling();
-            }
-          }, delay);
-        } else {
-          console.log('达到最大重连次数，降级到轮询');
-          startPolling();
-        }
-      };
-      
-      return true;
-    } catch (err) {
-      console.error('建立SSE连接失败:', err);
-      setConnectionState(ConnectionState.DISCONNECTED);
-      return false;
-    }
-  }, [getToken, handleBalanceUpdate, getReconnectDelay, startPolling]);
   
   // 连接WebSocket
   const connectWebSocket = useCallback(() => {
-    const token = getToken();
-    if (!token) {
-      console.error('WebSocket连接失败: 未找到令牌');
-      return false;
+    if (!token || isConnectingRef.current) {
+      return;
     }
     
     try {
-      setConnectionState(ConnectionState.CONNECTING);
-      setConnectionType(ConnectionType.WEBSOCKET);
+      isConnectingRef.current = true;
+      setConnectionStatus('connecting');
+      setConnectionType('websocket');
       
       // 获取WebSocket URL
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      const wsUrl = `${protocol}//${host}?token=${token}`;
+      const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
       
       // 创建WebSocket连接
-      const ws = new WebSocket(wsUrl);
+      const ws = new WebSocket(`${wsUrl}?token=${token}`);
       wsRef.current = ws;
       
-      // 连接打开时
+      // 连接打开事件
       ws.onopen = () => {
-        console.log('WebSocket连接已建立');
-        setConnectionState(ConnectionState.CONNECTED);
-        reconnectAttemptsRef.current = 0; // 重置重连计数
+        console.log('[CreditContext] WebSocket连接已打开');
+        setConnectionStatus('connected');
+        wsReconnectAttemptsRef.current = 0;
+        isConnectingRef.current = false;
       };
       
-      // 接收消息时
+      // 接收消息事件
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
           
-          if (message.type === 'balance_update' && message.data) {
+          if (message.type === 'balance_update') {
             handleBalanceUpdate(message.data);
           } else if (message.type === 'error') {
-            console.error('WebSocket错误:', message.message);
+            console.error('[CreditContext] WebSocket错误:', message.message);
           }
         } catch (err) {
-          console.error('解析WebSocket消息失败:', err);
+          console.error('[CreditContext] 解析WebSocket消息失败:', err);
         }
       };
       
-      // 连接关闭时
+      // 连接关闭事件
       ws.onclose = () => {
-        console.log('WebSocket连接已关闭');
-        setConnectionState(ConnectionState.DISCONNECTED);
+        console.log('[CreditContext] WebSocket连接已关闭');
+        wsRef.current = null;
         
-        // 尝试重连
-        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-          reconnectAttemptsRef.current++;
-          const delay = getReconnectDelay();
+        // 如果不是主动断开，则尝试重连
+        if (connectionStatus !== 'disconnected') {
+          setConnectionStatus('disconnected');
           
-          console.log(`将在${delay}毫秒后尝试重新连接(WebSocket)...`);
-          setConnectionState(ConnectionState.RECONNECTING);
-          
-          reconnectTimeoutRef.current = window.setTimeout(() => {
-            // 尝试重新连接WebSocket，如果失败则降级到SSE
-            if (!connectWebSocket()) {
-              connectSSE();
-            }
-          }, delay);
-        } else {
-          console.log('达到最大重连次数，降级到SSE');
-          connectSSE();
+          // 尝试WebSocket重连
+          if (wsReconnectAttemptsRef.current < WS_MAX_RECONNECT_ATTEMPTS) {
+            wsReconnectAttemptsRef.current++;
+            console.log(`[CreditContext] 尝试WebSocket重连 (${wsReconnectAttemptsRef.current}/${WS_MAX_RECONNECT_ATTEMPTS})...`);
+            
+            setTimeout(() => {
+              isConnectingRef.current = false;
+              connectWebSocket();
+            }, WS_RECONNECT_DELAY);
+          } else {
+            // WebSocket重连失败，降级到SSE
+            console.log('[CreditContext] WebSocket重连失败，降级到SSE');
+            isConnectingRef.current = false;
+            connectSSE();
+          }
         }
       };
       
-      // 连接错误时
+      // 连接错误事件
       ws.onerror = (error) => {
-        console.error('WebSocket连接错误:', error);
-        // WebSocket会自动触发onclose，所以这里不需要额外处理
+        console.error('[CreditContext] WebSocket连接错误:', error);
+        setConnectionStatus('error');
+      };
+    } catch (err) {
+      console.error('[CreditContext] 创建WebSocket连接失败:', err);
+      setConnectionStatus('error');
+      isConnectingRef.current = false;
+      
+      // 降级到SSE
+      connectSSE();
+    }
+  }, [token, connectionStatus, handleBalanceUpdate]);
+  
+  // 连接SSE
+  const connectSSE = useCallback(() => {
+    if (!token || isConnectingRef.current) {
+      return;
+    }
+    
+    try {
+      isConnectingRef.current = true;
+      setConnectionStatus('connecting');
+      setConnectionType('sse');
+      
+      // 获取SSE URL
+      const sseUrl = `/api/credits/sse`;
+      
+      // 创建SSE连接
+      // 注意：标准EventSource不支持自定义headers，这里使用了一个变通方法
+      // 在实际实现中，可能需要使用支持headers的库或将token作为URL参数传递
+      const eventSource = new EventSource(`${sseUrl}?token=${token}`);
+      eventSourceRef.current = eventSource;
+      
+      // 连接打开事件
+      eventSource.onopen = () => {
+        console.log('[CreditContext] SSE连接已打开');
+        setConnectionStatus('connected');
+        sseReconnectAttemptsRef.current = 0;
+        isConnectingRef.current = false;
       };
       
-      return true;
+      // 接收消息事件
+      eventSource.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          
+          if (message.type === 'balance_update') {
+            handleBalanceUpdate(message.data);
+          } else if (message.type === 'error') {
+            console.error('[CreditContext] SSE错误:', message.message);
+          }
+        } catch (err) {
+          console.error('[CreditContext] 解析SSE消息失败:', err);
+        }
+      };
+      
+      // 连接错误事件
+      eventSource.onerror = () => {
+        console.error('[CreditContext] SSE连接错误');
+        eventSourceRef.current = null;
+        
+        // 如果不是主动断开，则尝试重连
+        if (connectionStatus !== 'disconnected') {
+          setConnectionStatus('disconnected');
+          
+          // 尝试SSE重连
+          if (sseReconnectAttemptsRef.current < SSE_MAX_RECONNECT_ATTEMPTS) {
+            sseReconnectAttemptsRef.current++;
+            console.log(`[CreditContext] 尝试SSE重连 (${sseReconnectAttemptsRef.current}/${SSE_MAX_RECONNECT_ATTEMPTS})...`);
+            
+            setTimeout(() => {
+              isConnectingRef.current = false;
+              connectSSE();
+            }, SSE_RECONNECT_DELAY);
+          } else {
+            // SSE重连失败，降级到轮询
+            console.log('[CreditContext] SSE重连失败，降级到轮询');
+            isConnectingRef.current = false;
+            startPolling();
+          }
+        }
+        
+        eventSource.close();
+      };
     } catch (err) {
-      console.error('建立WebSocket连接失败:', err);
-      setConnectionState(ConnectionState.DISCONNECTED);
-      return false;
+      console.error('[CreditContext] 创建SSE连接失败:', err);
+      setConnectionStatus('error');
+      isConnectingRef.current = false;
+      
+      // 降级到轮询
+      startPolling();
     }
-  }, [getToken, handleBalanceUpdate, getReconnectDelay, connectSSE]);
+  }, [token, connectionStatus, handleBalanceUpdate]);
   
-  // 初始化连接
-  const initConnection = useCallback(() => {
+  // 开始轮询
+  const startPolling = useCallback(() => {
+    if (!token || isConnectingRef.current) {
+      return;
+    }
+    
+    try {
+      isConnectingRef.current = true;
+      setConnectionStatus('connecting');
+      setConnectionType('polling');
+      
+      // 清理现有轮询
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+      
+      // 定义轮询函数
+      const poll = async () => {
+        try {
+          const response = await fetch('/api/credits/balance/poll', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`轮询失败: ${response.status} ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          
+          // 更新连接状态
+          if (connectionStatus !== 'connected') {
+            setConnectionStatus('connected');
+            isConnectingRef.current = false;
+          }
+          
+          // 更新余额
+          handleBalanceUpdate(data);
+          
+          // 更新轮询间隔（如果服务器提供）
+          if (data.poll_interval && pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = setInterval(poll, data.poll_interval);
+          }
+        } catch (err) {
+          console.error('[CreditContext] 轮询失败:', err);
+          setConnectionStatus('error');
+        }
+      };
+      
+      // 立即执行一次轮询
+      poll();
+      
+      // 设置轮询间隔
+      pollingIntervalRef.current = setInterval(poll, POLLING_INTERVAL);
+      
+      console.log('[CreditContext] 已启动轮询，间隔:', POLLING_INTERVAL, 'ms');
+    } catch (err) {
+      console.error('[CreditContext] 启动轮询失败:', err);
+      setConnectionStatus('error');
+      isConnectingRef.current = false;
+    }
+  }, [token, connectionStatus, handleBalanceUpdate]);
+  
+  // 重新连接
+  const reconnect = useCallback(() => {
     // 清理现有连接
     cleanupConnections();
     
-    // 重置重连计数
-    reconnectAttemptsRef.current = 0;
+    // 重置连接状态
+    wsReconnectAttemptsRef.current = 0;
+    sseReconnectAttemptsRef.current = 0;
     
-    // 尝试按优先级建立连接：WebSocket > SSE > 轮询
-    if (!connectWebSocket()) {
-      if (!connectSSE()) {
-        startPolling();
-      }
-    }
-  }, [cleanupConnections, connectWebSocket, connectSSE, startPolling]);
+    // 优先尝试WebSocket
+    connectWebSocket();
+  }, [cleanupConnections, connectWebSocket]);
   
-  // 初始化
+  // 当用户或令牌变化时，重新连接
   useEffect(() => {
-    // 先获取一次初始数据
-    refreshCredits();
+    if (user && token) {
+      reconnect();
+    } else {
+      disconnect();
+    }
     
-    // 初始化连接
-    initConnection();
-    
-    // 监听网络状态变化
-    const handleOnline = () => {
-      console.log('网络已连接，重新建立连接');
-      initConnection();
-    };
-    
-    const handleOffline = () => {
-      console.log('网络已断开');
-      setConnectionState(ConnectionState.DISCONNECTED);
-      cleanupConnections();
-    };
-    
-    // 添加网络状态监听
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    // 监听登录状态变化
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'supabaseToken' || e.key === 'user') {
-        console.log('用户登录状态已变化，重新建立连接');
-        initConnection();
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    
-    // 清理函数
+    // 组件卸载时清理连接
     return () => {
       cleanupConnections();
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('storage', handleStorageChange);
     };
-  }, [refreshCredits, initConnection, cleanupConnections]);
+  }, [user, token, reconnect, disconnect, cleanupConnections]);
   
-  // 提供上下文值
-  const contextValue: CreditContextType = {
+  // 使用useMemo优化上下文值，避免不必要的重新渲染
+  const contextValue = useMemo(() => ({
     totalCredits,
     balances,
-    isLoading,
-    error,
-    connectionState,
+    connectionStatus,
     connectionType,
-    refreshCredits,
-  };
+    lastUpdated,
+    reconnect,
+    disconnect
+  }), [totalCredits, balances, connectionStatus, connectionType, lastUpdated, reconnect, disconnect]);
   
   return (
     <CreditContext.Provider value={contextValue}>
@@ -386,13 +403,5 @@ export const CreditProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 };
 
-// 自定义钩子，用于在组件中使用上下文
-export const useCredits = () => {
-  const context = useContext(CreditContext);
-  if (context === undefined) {
-    throw new Error('useCredits must be used within a CreditProvider');
-  }
-  return context;
-};
-
-export default CreditContext; 
+// 自定义钩子，用于在组件中访问上下文
+export const useCredit = () => useContext(CreditContext); 

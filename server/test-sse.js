@@ -1,88 +1,94 @@
 /**
- * SSE服务端测试脚本
+ * SSE客户端测试脚本
+ * 用于测试SSE连接和积分余额实时推送
  * 
  * 使用方法：
- * 1. 确保服务器已启动
- * 2. 运行 node test-sse.js <JWT令牌>
+ * node test-sse.js <token>
  */
 
 const fetch = require('node-fetch');
 const dotenv = require('dotenv');
+const EventSource = require('eventsource');
 
 // 加载环境变量
 dotenv.config();
 
 // 获取命令行参数
 const token = process.argv[2];
-
 if (!token) {
-  console.error('错误: 缺少JWT令牌参数');
-  console.error('用法: node test-sse.js <JWT令牌>');
+  console.error('请提供JWT令牌');
+  console.error('用法: node test-sse.js <token>');
   process.exit(1);
 }
 
-// 服务器地址
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:9000';
+// SSE服务器URL
+const API_URL = process.env.API_URL || 'http://localhost:3000';
+const SSE_URL = `${API_URL}/api/credits/sse`;
 
-// 创建SSE连接
-console.log('正在连接SSE服务端...');
-console.log(`URL: ${SERVER_URL}/api/credits/sse`);
-console.log(`Token: ${token.substring(0, 10)}...`);
+console.log(`正在连接到SSE服务器: ${SSE_URL}`);
 
-// 由于Node.js没有内置的EventSource，我们使用fetch并手动处理响应流
-async function connectSSE() {
+// 创建EventSource连接
+const headers = {
+  'Authorization': `Bearer ${token}`
+};
+
+const eventSource = new EventSource(SSE_URL, { headers });
+
+// 连接打开事件
+eventSource.onopen = () => {
+  console.log('已连接到SSE服务器');
+};
+
+// 接收消息事件
+eventSource.onmessage = (event) => {
   try {
-    const response = await fetch(`${SERVER_URL}/api/credits/sse`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    const message = JSON.parse(event.data);
     
-    if (!response.ok) {
-      console.error(`连接失败: ${response.status} ${response.statusText}`);
-      const text = await response.text();
-      console.error(`响应内容: ${text}`);
-      process.exit(1);
+    // 根据消息类型处理
+    switch (message.type) {
+      case 'connected':
+        console.log(`连接成功: 用户ID = ${message.userId}`);
+        break;
+        
+      case 'balance_update':
+        console.log('收到积分余额更新:');
+        console.log(`- 总积分: ${message.data.total_credits}`);
+        console.log('- 积分明细:');
+        message.data.balances.forEach(balance => {
+          console.log(`  * ${balance.credit_type}: ${balance.amount} (过期时间: ${new Date(balance.expiry_date).toLocaleString()})`);
+        });
+        break;
+        
+      case 'ping':
+        console.log(`收到ping消息: ${new Date(message.timestamp).toLocaleString()}`);
+        break;
+        
+      case 'error':
+        console.error(`错误: ${message.message}`);
+        break;
+        
+      default:
+        console.log('收到未知类型的消息:', message);
     }
-    
-    console.log('连接成功，等待事件...');
-    
-    // 处理响应流
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      
-      buffer += decoder.decode(value, { stream: true });
-      
-      // 处理接收到的数据
-      const lines = buffer.split('\n\n');
-      buffer = lines.pop() || ''; // 保留最后一个不完整的块
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6); // 去掉 "data: " 前缀
-          try {
-            const event = JSON.parse(data);
-            console.log(`[${new Date().toISOString()}] 收到事件:`, event.type);
-            console.log(JSON.stringify(event, null, 2));
-            console.log('-----------------------------------');
-          } catch (e) {
-            console.error('解析事件数据失败:', e);
-            console.error('原始数据:', data);
-          }
-        }
-      }
-    }
-    
   } catch (err) {
-    console.error('连接或处理SSE流时出错:', err);
-    process.exit(1);
+    console.error('解析消息失败:', err.message);
+    console.error('原始消息:', event.data);
   }
-}
+};
 
-// 启动连接
-connectSSE(); 
+// 连接错误事件
+eventSource.onerror = (error) => {
+  console.error('SSE连接错误:', error);
+  
+  // 尝试重新连接
+  console.log('尝试重新连接...');
+};
+
+// 处理进程退出
+process.on('SIGINT', () => {
+  console.log('正在关闭SSE连接...');
+  
+  eventSource.close();
+  
+  process.exit(0);
+}); 

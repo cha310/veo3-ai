@@ -1,83 +1,105 @@
 /**
- * 积分变动模拟工具
+ * 模拟积分变动脚本
+ * 用于测试实时推送功能
  * 
  * 使用方法：
- * 1. 确保服务器已启动
- * 2. 运行 node simulate-credit-change.js <JWT令牌> <用户ID> <积分变动量>
+ * node simulate-credit-change.js <user_id> <amount> <type>
+ * 
+ * 参数说明：
+ * - user_id: 用户ID
+ * - amount: 积分变动数量，正数为增加，负数为减少
+ * - type: 变动类型，如 'manual', 'purchase', 'subscription', 'video_generation' 等
  */
 
-const fetch = require('node-fetch');
 const dotenv = require('dotenv');
+const { createClient } = require('@supabase/supabase-js');
+const { publishCreditChange } = require('./websocket');
+const redisPubSub = require('./redis-pubsub');
 
 // 加载环境变量
 dotenv.config();
 
-// 获取命令行参数
-const token = process.argv[2];
-const userId = process.argv[3];
-const amount = parseInt(process.argv[4], 10);
+// 从环境变量读取Supabase配置
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!token || !userId || isNaN(amount)) {
-  console.error('错误: 缺少必要参数');
-  console.error('用法: node simulate-credit-change.js <JWT令牌> <用户ID> <积分变动量>');
-  console.error('示例: node simulate-credit-change.js eyJhbGciOi... 123e4567-e89b-12d3-a456-426614174000 100');
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  console.error('未检测到 SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 环境变量');
   process.exit(1);
 }
 
-// 服务器地址
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:9000';
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-// 根据积分变动量选择接口
-const API_URL = amount >= 0 
-  ? `${SERVER_URL}/api/credits/add/manual` // 增加积分
-  : `${SERVER_URL}/api/credits/deduct`; // 扣除积分
+// 获取命令行参数
+const userId = process.argv[2];
+const amount = parseInt(process.argv[3]);
+const type = process.argv[4] || 'manual';
 
-console.log(`正在模拟积分${amount >= 0 ? '增加' : '扣除'}...`);
-console.log(`用户ID: ${userId}`);
-console.log(`变动量: ${Math.abs(amount)}`);
-console.log(`API URL: ${API_URL}`);
+if (!userId || isNaN(amount)) {
+  console.error('请提供有效的用户ID和积分变动数量');
+  console.error('用法: node simulate-credit-change.js <user_id> <amount> <type>');
+  process.exit(1);
+}
 
-// 发送请求
+// 模拟积分变动
 async function simulateCreditChange() {
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        amount: Math.abs(amount),
-        reason: '测试积分变动',
-        description: '通过模拟工具测试积分实时推送'
-      })
+    console.log(`模拟积分变动: 用户=${userId}, 数量=${amount}, 类型=${type}`);
+    
+    // 1. 调用Supabase存储过程添加积分
+    const { data, error } = await supabase.rpc('add_credits', {
+      p_user_id: userId,
+      p_amount: amount,
+      p_credit_type: 'standard',
+      p_expiry_days: 365,
+      p_description: `模拟积分变动: ${type}`,
+      p_metadata: { source: 'simulation', type }
     });
     
-    const text = await response.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      data = { text };
-    }
-    
-    if (!response.ok) {
-      console.error(`请求失败: ${response.status} ${response.statusText}`);
-      console.error('响应内容:', data);
+    if (error) {
+      console.error('添加积分失败:', error);
       process.exit(1);
     }
     
-    console.log('请求成功!');
-    console.log('响应数据:', data);
-    console.log('-----------------------------------');
-    console.log('现在可以检查WebSocket/SSE客户端是否收到了积分变动通知');
+    console.log('积分添加成功:', data);
     
+    // 2. 发布积分变动事件
+    console.log('正在发布积分变动事件...');
+    
+    // 通过WebSocket发布（内部会处理Redis发布）
+    await publishCreditChange(userId, amount, type, { source: 'simulation' });
+    
+    // 直接通过Redis发布（测试Redis Pub/Sub）
+    if (redisPubSub.isRedisAvailable()) {
+      await redisPubSub.publishCreditChange(userId, amount, type, { source: 'simulation_redis' });
+    }
+    
+    console.log('积分变动事件已发布');
+    
+    // 等待事件处理完成
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    console.log('模拟完成');
+    process.exit(0);
   } catch (err) {
-    console.error('请求出错:', err);
+    console.error('模拟积分变动失败:', err.message);
     process.exit(1);
   }
 }
 
-// 执行模拟
-simulateCreditChange(); 
+// 初始化Redis并执行模拟
+async function init() {
+  try {
+    // 初始化Redis
+    await redisPubSub.initRedisClients();
+    
+    // 执行模拟
+    await simulateCreditChange();
+  } catch (err) {
+    console.error('初始化失败:', err.message);
+    process.exit(1);
+  }
+}
+
+// 开始执行
+init(); 

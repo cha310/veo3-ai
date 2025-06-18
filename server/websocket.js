@@ -1,6 +1,7 @@
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
+const redisPubSub = require('./redis-pubsub');
 
 // 从环境变量读取Supabase配置
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -114,7 +115,31 @@ function initWebSocketServer(server) {
     }
   });
   
+  // 初始化Redis Pub/Sub
+  initRedisPubSub();
+  
   return wss;
+}
+
+// 初始化Redis Pub/Sub
+async function initRedisPubSub() {
+  try {
+    // 初始化Redis客户端
+    await redisPubSub.initRedisClients();
+    
+    // 注册积分变动事件处理器
+    redisPubSub.onCreditChange((data) => {
+      console.log(`[WebSocket] 收到Redis积分变动事件: ${data.userId} ${data.amount} ${data.type}`);
+      
+      // 向用户发送积分余额更新
+      sendUserBalance(data.userId);
+    });
+    
+    console.log('[WebSocket] Redis Pub/Sub已初始化');
+  } catch (err) {
+    console.error('[WebSocket] 初始化Redis Pub/Sub失败:', err.message);
+    console.log('[WebSocket] 将使用本地推送机制');
+  }
 }
 
 // 移除客户端连接
@@ -191,6 +216,29 @@ async function sendUserBalance(userId) {
   }
 }
 
+// 发布积分变动事件
+async function publishCreditChange(userId, amount, type, metadata = {}) {
+  try {
+    // 尝试通过Redis发布事件
+    if (redisPubSub.isRedisAvailable()) {
+      await redisPubSub.publishCreditChange(userId, amount, type, metadata);
+    } else {
+      // Redis不可用，直接发送余额更新
+      console.log(`[WebSocket] Redis不可用，直接发送余额更新: ${userId} ${amount} ${type}`);
+      await sendUserBalance(userId);
+    }
+  } catch (err) {
+    console.error('[WebSocket] 发布积分变动事件失败:', err.message);
+    
+    // 出错时，尝试直接发送余额更新
+    try {
+      await sendUserBalance(userId);
+    } catch (sendErr) {
+      console.error('[WebSocket] 直接发送余额更新也失败:', sendErr.message);
+    }
+  }
+}
+
 // 向所有连接的客户端广播消息
 function broadcastMessage(message) {
   for (const [userId, connections] of clients.entries()) {
@@ -202,9 +250,35 @@ function broadcastMessage(message) {
   }
 }
 
+// 关闭WebSocket服务
+async function closeWebSocketServer() {
+  try {
+    // 关闭Redis连接
+    await redisPubSub.closeRedisConnections();
+    
+    // 关闭所有WebSocket连接
+    for (const connections of clients.values()) {
+      connections.forEach(ws => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close();
+        }
+      });
+    }
+    
+    // 清空客户端Map
+    clients.clear();
+    
+    console.log('[WebSocket] WebSocket服务已关闭');
+  } catch (err) {
+    console.error('[WebSocket] 关闭WebSocket服务失败:', err.message);
+  }
+}
+
 module.exports = {
   initWebSocketServer,
   sendUserBalance,
+  publishCreditChange,
   broadcastMessage,
-  getConnectedClientsCount
+  getConnectedClientsCount,
+  closeWebSocketServer
 }; 

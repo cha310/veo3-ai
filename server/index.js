@@ -5,12 +5,13 @@ const dotenv = require('dotenv');
 const fs = require('fs');
 const http = require('http');
 const { initWebSocketServer } = require('./websocket');
+const redisPubSub = require('./redis-pubsub');
 
 // 加载环境变量
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 9000;
+const PORT = process.env.PORT || 3000;
 
 // 创建HTTP服务器，用于同时支持Express和WebSocket
 const server = http.createServer(app);
@@ -80,20 +81,22 @@ app.use((req, res, next) => {
   next();
 });
 
-// 导入路由
-const authRoutes = require('./routes/auth');
-const adminRoutes = require('./routes/admin');
-const creditRoutes = require('./routes/credits');
-
 // 静态文件
 const distPath = path.join(__dirname, '../dist');
 console.log('静态文件路径：', distPath);
 app.use(express.static(distPath));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
+// 导入路由
+const authRoutes = require('./routes/auth');
+const adminRoutes = require('./routes/admin');
+const { router: creditsRoutes } = require('./routes/credits');
 
 // 注册API路由
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/credits', creditRoutes);
+app.use('/api/credits', creditsRoutes);
 
 // 添加健康检查端点
 app.get('/health', (req, res) => {
@@ -122,11 +125,43 @@ app.get('*', (req, res) => {
 // 初始化WebSocket服务
 const wss = initWebSocketServer(server);
 
+// 初始化Redis Pub/Sub
+(async () => {
+  try {
+    await redisPubSub.initRedisClients();
+    console.log('[Server] Redis Pub/Sub已初始化');
+  } catch (err) {
+    console.error('[Server] 初始化Redis Pub/Sub失败:', err.message);
+    console.log('[Server] 将使用本地推送机制');
+  }
+})();
+
 // 启动HTTP服务器
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`服务器已启动，运行在端口 ${PORT}`);
+  console.log(`[Server] 服务器已启动，运行在端口 ${PORT}`);
   console.log(`网站可通过 http://localhost:${PORT} 访问`);
   console.log(`WebSocket服务可通过 ws://localhost:${PORT} 访问`);
   console.log(`服务器监听在所有网络接口上 (0.0.0.0:${PORT})`);
   console.log(`管理员密码: ${process.env.ADMIN_PASSWORD || 'veoai-admin-2024'}`);
-}); 
+});
+
+// 处理进程退出
+process.on('SIGINT', async () => {
+  console.log('[Server] 正在关闭服务器...');
+  
+  try {
+    // 关闭Redis连接
+    await redisPubSub.closeRedisConnections();
+    
+    // 关闭HTTP服务器
+    server.close(() => {
+      console.log('[Server] 服务器已关闭');
+      process.exit(0);
+    });
+  } catch (err) {
+    console.error('[Server] 关闭服务器时出错:', err.message);
+    process.exit(1);
+  }
+});
+
+module.exports = app; 
