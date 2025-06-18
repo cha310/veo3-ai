@@ -110,6 +110,19 @@ export const updateUserCredits = (newCredits: number): boolean => {
 // 消费积分API
 export const apiConsumeCredits = async (amount: number, type: string, source: string, description?: string): Promise<boolean> => {
   try {
+    // 首先验证用户积分余额
+    const validateResult = await validateUserCredits();
+    if (validateResult.wasRepaired) {
+      console.log('积分余额已自动修复，当前积分:', validateResult.currentCredits);
+    }
+    
+    // 获取最新积分并检查是否足够
+    const { total: currentCredits } = await fetchUserCredits();
+    if (currentCredits < amount) {
+      console.error('积分不足，无法消费:', { required: amount, available: currentCredits });
+      return false;
+    }
+    
     const response = await fetch(`${API_BASE_URL}/consume`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -142,20 +155,31 @@ export const apiConsumeCredits = async (amount: number, type: string, source: st
 
 // Consume credits - returns whether successful
 export const consumeCredits = (modelId: string): boolean => {
-  const currentCredits = getUserCredits();
   const cost = CREDIT_COSTS[modelId as keyof typeof CREDIT_COSTS] || 0;
-  
-  if (currentCredits < cost) {
-    return false; // Not enough credits
-  }
   
   // 调用API消费积分
   apiConsumeCredits(cost, 'video_generation', modelId, `生成${modelId}视频`)
+    .then(success => {
+      if (!success) {
+        console.error('API消费积分失败');
+      }
+    })
     .catch(error => {
       console.error('API消费积分失败，回退到本地消费:', error);
       // 如果API调用失败，回退到本地消费
-      updateUserCredits(currentCredits - cost);
+      const currentCredits = getUserCredits();
+      if (currentCredits >= cost) {
+        updateUserCredits(currentCredits - cost);
+      }
     });
+  
+  // 先获取当前积分
+  const currentCredits = getUserCredits();
+  
+  // 检查积分是否足够
+  if (currentCredits < cost) {
+    return false; // Not enough credits
+  }
   
   // 先更新本地状态，保证UI响应
   return updateUserCredits(currentCredits - cost);
@@ -466,6 +490,28 @@ export const checkVideoGenerationCredits = async (options: VideoGenerationOption
 // 视频生成时扣除积分
 export const consumeVideoGenerationCredits = async (options: VideoGenerationOptions): Promise<VideoGenerationResult> => {
   try {
+    // 首先验证用户积分余额
+    const validateResult = await validateUserCredits();
+    if (validateResult.wasRepaired) {
+      console.log('积分余额已自动修复，当前积分:', validateResult.currentCredits);
+    }
+    
+    // 检查积分是否足够
+    const checkResult = await checkVideoGenerationCredits(options);
+    if (!checkResult.hasEnough) {
+      return {
+        success: false,
+        error: {
+          code: 'INSUFFICIENT_CREDITS',
+          message: '积分不足',
+          details: {
+            required: checkResult.required,
+            available: checkResult.current
+          }
+        }
+      };
+    }
+    
     const response = await fetch(`${API_BASE_URL}/consume/video`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -523,6 +569,126 @@ export const consumeVideoGenerationCredits = async (options: VideoGenerationOpti
         code: 'INTERNAL_ERROR',
         message: '视频生成扣除积分失败'
       }
+    };
+  }
+};
+
+// 积分余额校验相关接口
+export interface ValidateCreditsResult {
+  success: boolean;
+  wasRepaired?: boolean;
+  currentCredits?: number;
+  error?: string;
+}
+
+// 验证并修复当前用户积分余额
+export const validateUserCredits = async (): Promise<ValidateCreditsResult> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/validate`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error(`验证积分余额失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.message || '验证积分余额失败');
+    }
+    
+    // 如果积分被修复，更新本地存储
+    if (data.data.was_repaired) {
+      updateLocalUserCredits(data.data.current_credits);
+    }
+    
+    return {
+      success: true,
+      wasRepaired: data.data.was_repaired,
+      currentCredits: data.data.current_credits
+    };
+  } catch (error) {
+    console.error('验证积分余额失败:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '验证积分余额失败'
+    };
+  }
+};
+
+// 管理员验证并修复指定用户积分余额
+export const validateUserCreditsAdmin = async (userId: string): Promise<ValidateCreditsResult> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/validate/admin/${userId}`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error(`验证用户积分余额失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.message || '验证用户积分余额失败');
+    }
+    
+    return {
+      success: true,
+      wasRepaired: data.data.was_repaired,
+      currentCredits: data.data.current_credits
+    };
+  } catch (error) {
+    console.error('验证用户积分余额失败:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '验证用户积分余额失败'
+    };
+  }
+};
+
+// 管理员验证并修复所有用户积分余额
+export const validateAllUserCredits = async (): Promise<{
+  success: boolean;
+  total?: number;
+  repaired?: number;
+  failed?: number;
+  details?: Array<{
+    user_id: string;
+    success: boolean;
+    was_repaired?: boolean;
+    error?: string;
+  }>;
+  error?: string;
+}> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/validate-all`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error(`验证所有用户积分余额失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.message || '验证所有用户积分余额失败');
+    }
+    
+    return {
+      success: true,
+      total: data.data.total,
+      repaired: data.data.repaired,
+      failed: data.data.failed,
+      details: data.data.details
+    };
+  } catch (error) {
+    console.error('验证所有用户积分余额失败:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '验证所有用户积分余额失败'
     };
   }
 }; 

@@ -950,4 +950,172 @@ router.post('/check/video', verifyAuth, async (req, res) => {
   }
 });
 
+// POST /api/credits/validate - 验证并修复用户积分余额
+router.post('/validate', verifyAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // 调用存储过程验证用户积分
+    const { data, error } = await supabase.rpc('validate_user_credits', { p_user_id: userId });
+    
+    if (error) {
+      console.error('验证用户积分失败:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: '验证积分失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    // 获取最新的用户积分
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id: userId });
+    
+    if (creditsError) {
+      console.error('获取用户积分失败:', creditsError);
+      return res.status(500).json({ 
+        success: false, 
+        message: '获取积分失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    const totalCredits = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        was_repaired: data === true,
+        current_credits: totalCredits
+      }
+    });
+  } catch (err) {
+    console.error('验证用户积分接口报错:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: '服务器内部错误',
+      error: { code: 'INTERNAL_ERROR' } 
+    });
+  }
+});
+
+// POST /api/credits/validate/admin/:userId - 管理员验证并修复指定用户积分余额
+router.post('/validate/admin/:userId', verifyAuth, verifyAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // 调用存储过程验证用户积分
+    const { data, error } = await supabase.rpc('validate_user_credits', { p_user_id: userId });
+    
+    if (error) {
+      console.error('管理员验证用户积分失败:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: '验证积分失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    // 获取最新的用户积分
+    const { data: userCredits, error: creditsError } = await supabase.rpc('get_user_credits', { user_id: userId });
+    
+    if (creditsError) {
+      console.error('获取用户积分失败:', creditsError);
+      return res.status(500).json({ 
+        success: false, 
+        message: '获取积分失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    const totalCredits = Array.isArray(userCredits) && userCredits.length ? userCredits[0].credits : 0;
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        was_repaired: data === true,
+        current_credits: totalCredits
+      }
+    });
+  } catch (err) {
+    console.error('管理员验证用户积分接口报错:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: '服务器内部错误',
+      error: { code: 'INTERNAL_ERROR' } 
+    });
+  }
+});
+
+// POST /api/credits/validate-all - 管理员验证并修复所有用户积分余额
+router.post('/validate-all', verifyAuth, verifyAdmin, async (req, res) => {
+  try {
+    // 获取所有用户
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id');
+    
+    if (usersError) {
+      console.error('获取用户列表失败:', usersError);
+      return res.status(500).json({ 
+        success: false, 
+        message: '获取用户列表失败',
+        error: { code: 'INTERNAL_ERROR' } 
+      });
+    }
+    
+    const results = {
+      total: users.length,
+      repaired: 0,
+      failed: 0,
+      details: []
+    };
+    
+    // 逐个验证用户积分
+    for (const user of users) {
+      try {
+        const { data, error } = await supabase.rpc('validate_user_credits', { p_user_id: user.id });
+        
+        if (error) {
+          console.error(`验证用户 ${user.id} 积分失败:`, error);
+          results.failed++;
+          results.details.push({
+            user_id: user.id,
+            success: false,
+            error: error.message
+          });
+        } else {
+          if (data === true) {
+            results.repaired++;
+          }
+          results.details.push({
+            user_id: user.id,
+            success: true,
+            was_repaired: data === true
+          });
+        }
+      } catch (err) {
+        console.error(`验证用户 ${user.id} 积分异常:`, err);
+        results.failed++;
+        results.details.push({
+          user_id: user.id,
+          success: false,
+          error: err.message
+        });
+      }
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: results
+    });
+  } catch (err) {
+    console.error('验证所有用户积分接口报错:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: '服务器内部错误',
+      error: { code: 'INTERNAL_ERROR' } 
+    });
+  }
+});
+
 module.exports = router; 
