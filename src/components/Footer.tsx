@@ -89,7 +89,7 @@ const Footer: React.FC = () => {
             <h3 className="text-lg font-semibold mb-4 bg-gradient-to-r from-[#8A7CFF] to-[#6C5CE7] bg-clip-text text-transparent">CONTACT</h3>
             <ul className="space-y-2">
               <li>
-                <a href="mailto:support@veo3.ai" className="text-gray-400 hover:text-white transition-colors">support@veo3-ai.net</a>
+                <a href="mailto:support@veo3-ai.net" className="text-gray-400 hover:text-white transition-colors">support@veo3-ai.net</a>
               </li>
             </ul>
           </div>

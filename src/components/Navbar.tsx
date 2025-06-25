@@ -158,7 +158,7 @@ const Navbar: React.FC = () => {
       <nav className="w-full px-4 md:px-8 flex items-center justify-between">
         <div className="flex items-center">
           <Link to="/" className="flex items-center">
-            <img src="/VEOAI2.svg" alt="VEO AI Logo" className="h-8 w-auto" />
+            <img src="/VEOAI2.svg" alt="VEO AI" className="h-8 w-auto" />
           </Link>
           
           {/* 移动汉堡菜单按钮移到Logo右侧 */}
